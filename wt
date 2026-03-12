@@ -12,6 +12,8 @@ Commands:
   list   <repo>            List all worktrees for a repo
   remove <repo> <branch>   Remove a worktree
   prune  <repo>            Prune stale worktree references
+
+Use '.' as <repo> to refer to the repo in the current directory.
 EOF
     exit 1
 }
@@ -25,6 +27,18 @@ sanitize_branch() {
     echo "${1//\//-}"
 }
 
+resolve_repo() {
+    local repo="$1"
+    if [[ "$repo" == "." ]]; then
+        local toplevel
+        toplevel="$(git rev-parse --show-toplevel 2>/dev/null)" \
+            || die "current directory is not inside a git repository"
+        basename "$toplevel"
+    else
+        echo "$repo"
+    fi
+}
+
 require_repo() {
     local repo_dir="$ROOT/$1"
     [[ -d "$repo_dir" ]] || die "repository '$1' not found at $repo_dir"
@@ -34,7 +48,8 @@ require_repo() {
 
 cmd_create() {
     [[ $# -eq 2 ]] || { echo "Usage: wt create <repo> <branch>" >&2; exit 1; }
-    local repo="$1" branch="$2"
+    local repo branch="$2"
+    repo="$(resolve_repo "$1")"
     require_repo "$repo"
 
     local repo_dir="$ROOT/$repo"
@@ -60,7 +75,8 @@ cmd_create() {
 
 cmd_list() {
     [[ $# -eq 1 ]] || { echo "Usage: wt list <repo>" >&2; exit 1; }
-    local repo="$1"
+    local repo
+    repo="$(resolve_repo "$1")"
     require_repo "$repo"
 
     git -C "$ROOT/$repo" worktree list
@@ -68,7 +84,8 @@ cmd_list() {
 
 cmd_remove() {
     [[ $# -eq 2 ]] || { echo "Usage: wt remove <repo> <branch>" >&2; exit 1; }
-    local repo="$1" branch="$2"
+    local repo branch="$2"
+    repo="$(resolve_repo "$1")"
     require_repo "$repo"
 
     local safe_branch
@@ -83,7 +100,8 @@ cmd_remove() {
 
 cmd_prune() {
     [[ $# -eq 1 ]] || { echo "Usage: wt prune <repo>" >&2; exit 1; }
-    local repo="$1"
+    local repo
+    repo="$(resolve_repo "$1")"
     require_repo "$repo"
 
     git -C "$ROOT/$repo" worktree prune -v
