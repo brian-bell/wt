@@ -28,20 +28,26 @@ WORKTREE_ROOT=~/projects ./bin/wt
 
 | Key | Action |
 |-----|--------|
-| `↑`/`k` | Move selection up |
-| `↓`/`j` | Move selection down |
-| `1` | Worktree view (branch, dirty status, ahead/behind, unpushed commits) |
-| `2` | Stashes view (placeholder) |
-| `3` | Branches view (placeholder) |
-| `q` | Quit |
+| `↑`/`k` | Move repo selection up |
+| `↓`/`j` | Move repo selection down |
+| `tab` | Cycle modes: worktrees → stashes → branches |
+| `←`/`h` | Previous item in right pane (wrapping) |
+| `→`/`l` | Next item in right pane (wrapping) |
+| `1`/`2`/`3` | Jump to worktrees / stashes / branches mode |
+| `enter` | View stash diff (stashes mode) |
+| `esc`/`q` | Close overlay or quit |
 
 ### Worktree view
 
 The right pane shows each worktree's:
 
-- Branch name with dirty (`●`) or clean (`✔`) indicator
+- Branch name with status indicator: `✔` clean (green), `●` dirty (yellow), `●` no upstream (red)
 - Ahead/behind counts relative to upstream (`+2/-1`)
 - Unpushed commit messages (up to 5, with overflow count)
+
+### Stashes view
+
+Browse stashes for the selected repo. Use `←`/`→` to select a stash, `enter` to view its diff in a full-screen overlay.
 
 ## Configuration
 

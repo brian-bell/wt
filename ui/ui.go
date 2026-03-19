@@ -24,16 +24,28 @@ var (
 	commitStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	activeModeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
 	inactiveModeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	stashDateStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	stashMsgStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
+	stashSelStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true).Reverse(true)
+	noUpstreamStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	diffAddStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	diffDelStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	diffHdrStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
 )
 
 // RenderParams holds everything the renderer needs.
 type RenderParams struct {
-	Repos     []scanner.Repo
-	Selected  int
-	Width     int
-	Height    int
-	Mode      int
-	Worktrees []gitquery.Worktree
+	Repos         []scanner.Repo
+	Selected      int
+	Width         int
+	Height        int
+	Mode          int
+	Worktrees     []gitquery.Worktree
+	Stashes       []gitquery.Stash
+	StashSelected int
+	Overlay       int
+	OverlayDiff   string
+	OverlayScroll int
 }
 
 // Render produces the full terminal view string.
@@ -45,7 +57,12 @@ func Render(p RenderParams) string {
 		p.Height = 24
 	}
 
-	statusBar := RenderStatusBar(p.Width, p.Mode)
+	// Overlay takes over the entire screen
+	if p.Overlay != 0 {
+		return renderOverlay(p)
+	}
+
+	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay)
 	contentHeight := p.Height - 1 // reserve 1 row for status bar
 
 	// Build left pane
@@ -58,9 +75,12 @@ func Render(p RenderParams) string {
 	}
 
 	var rightLines []string
-	if p.Mode == 1 && len(p.Worktrees) > 0 {
+	switch {
+	case p.Mode == 1 && len(p.Worktrees) > 0:
 		rightLines = renderWorktreePane(p.Worktrees, rightWidth, contentHeight)
-	} else {
+	case p.Mode == 2 && len(p.Stashes) > 0:
+		rightLines = renderStashPane(p.Stashes, p.StashSelected, rightWidth, contentHeight)
+	default:
 		rightLines = renderPlaceholderPane(rightWidth, contentHeight)
 	}
 
@@ -81,7 +101,7 @@ func Render(p RenderParams) string {
 }
 
 // RenderStatusBar produces the bottom status bar.
-func RenderStatusBar(width, mode int) string {
+func RenderStatusBar(width, mode, overlay int) string {
 	modes := []struct {
 		key  int
 		name string
@@ -100,7 +120,16 @@ func RenderStatusBar(width, mode int) string {
 		}
 	}
 
-	text := "  " + strings.Join(parts, " ") + "  ✔ clean  ● dirty  ↑/↓ navigate  ←/→ mode  q/esc: quit"
+	var hints string
+	if overlay != 0 {
+		hints = "  ↑/↓ scroll  esc: close"
+	} else if mode == 2 {
+		hints = "  ↑/↓ navigate  ←/→ stash  enter: diff  tab: mode  q/esc: quit"
+	} else {
+		hints = "  " + cleanStyle.Render("✔") + " clean  " + dirtyStyle.Render("●") + " dirty  " + noUpstreamStyle.Render("●") + " no upstream  ↑/↓ navigate  tab: mode  q/esc: quit"
+	}
+
+	text := "  " + strings.Join(parts, " ") + hints
 	return statusStyle.Width(width).Render(text)
 }
 
@@ -148,7 +177,9 @@ func renderWorktreePane(worktrees []gitquery.Worktree, width, height int) []stri
 		// Branch line: "  main ✔" or "  feature/auth ● +2/-1"
 		branch := branchStyle.Render(wt.Branch)
 		var status string
-		if wt.Dirty {
+		if !wt.HasUpstream {
+			status = noUpstreamStyle.Render(" ●")
+		} else if wt.Dirty {
 			status = dirtyStyle.Render(" ●")
 		} else {
 			status = cleanStyle.Render(" ✔")
@@ -193,6 +224,82 @@ func renderWorktreePane(worktrees []gitquery.Worktree, width, height int) []stri
 		}
 	}
 	return lines
+}
+
+func renderStashPane(stashes []gitquery.Stash, selected, width, height int) []string {
+	var content []string
+
+	for i, s := range stashes {
+		// Truncate date to just the date portion (first 10 chars)
+		date := s.Date
+		if len(date) > 10 {
+			date = date[:10]
+		}
+
+		dateStr := stashDateStyle.Render(date)
+		msgStr := stashMsgStyle.Render(s.Message)
+		line := fmt.Sprintf("  %s  %s", dateStr, msgStr)
+
+		if i == selected {
+			// Render selected line with highlight
+			line = stashSelStyle.Width(width).Render(fmt.Sprintf(" > %s  %s", date, s.Message))
+		}
+
+		content = append(content, truncateToWidth(line, width))
+	}
+
+	// Pad to fill height
+	lines := make([]string, height)
+	for i := 0; i < height; i++ {
+		if i < len(content) {
+			lines[i] = content[i]
+		} else {
+			lines[i] = ""
+		}
+	}
+	return lines
+}
+
+func renderOverlay(p RenderParams) string {
+	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay)
+	contentHeight := p.Height - 1
+
+	var diffLines []string
+	if p.OverlayDiff != "" {
+		diffLines = strings.Split(p.OverlayDiff, "\n")
+	}
+
+	// Apply scroll offset
+	start := p.OverlayScroll
+	if start > len(diffLines) {
+		start = len(diffLines)
+	}
+	visible := diffLines[start:]
+
+	lines := make([]string, contentHeight)
+	for i := 0; i < contentHeight; i++ {
+		if i < len(visible) {
+			line := visible[i]
+			// Colorize diff lines
+			switch {
+			case strings.HasPrefix(line, "+"):
+				lines[i] = diffAddStyle.Render(line)
+			case strings.HasPrefix(line, "-"):
+				lines[i] = diffDelStyle.Render(line)
+			case strings.HasPrefix(line, "@@"):
+				lines[i] = diffHdrStyle.Render(line)
+			case strings.HasPrefix(line, "diff "):
+				lines[i] = diffHdrStyle.Render(line)
+			default:
+				lines[i] = line
+			}
+			lines[i] = truncateToWidth(lines[i], p.Width)
+		} else {
+			lines[i] = ""
+		}
+	}
+
+	return strings.Join(lines, "\n") + "\n" + statusBar
 }
 
 // truncateToWidth trims a styled string to fit within maxWidth visible columns.
