@@ -205,7 +205,7 @@ func TestListWorktrees_UnpushedCommits(t *testing.T) {
 	}
 }
 
-func TestListWorktrees_UnpushedTruncation(t *testing.T) {
+func TestListWorktrees_UnpushedReturnsFullMessage(t *testing.T) {
 	tmp := realPath(t, t.TempDir())
 	bare := filepath.Join(tmp, "remote.git")
 	clone := filepath.Join(tmp, "clone")
@@ -222,7 +222,7 @@ func TestListWorktrees_UnpushedTruncation(t *testing.T) {
 	run(t, clone, "git", "commit", "-m", "first")
 	run(t, clone, "git", "push")
 
-	// Commit with a very long message (>60 chars)
+	// Commit with a very long message (>60 chars) — data layer should not truncate
 	longMsg := strings.Repeat("x", 80)
 	if err := os.WriteFile(filepath.Join(clone, "f.txt"), []byte("b"), 0o644); err != nil {
 		t.Fatal(err)
@@ -237,8 +237,8 @@ func TestListWorktrees_UnpushedTruncation(t *testing.T) {
 	if len(wts[0].Unpushed) != 1 {
 		t.Fatalf("expected 1 unpushed commit, got %d", len(wts[0].Unpushed))
 	}
-	if len(wts[0].Unpushed[0]) > 60 {
-		t.Errorf("expected unpushed message truncated to ≤60 chars, got %d: %q", len(wts[0].Unpushed[0]), wts[0].Unpushed[0])
+	if !strings.Contains(wts[0].Unpushed[0], longMsg) {
+		t.Errorf("expected full message preserved, got %q", wts[0].Unpushed[0])
 	}
 }
 

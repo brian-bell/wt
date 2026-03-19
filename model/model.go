@@ -69,8 +69,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = (m.mode+1)%3 + 1
 			return m, m.fetchIfWorktrees()
 		case "1":
-			m.mode = ModeWorktrees
-			return m, m.fetchWorktrees()
+			if m.mode != ModeWorktrees {
+				m.mode = ModeWorktrees
+				return m, m.fetchWorktrees()
+			}
 		case "2":
 			m.mode = ModeStashes
 		case "3":

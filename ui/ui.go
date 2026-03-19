@@ -135,10 +135,15 @@ func renderRepoList(repos []scanner.Repo, selected, height int) []string {
 func renderWorktreePane(worktrees []gitquery.Worktree, width, height int) []string {
 	var content []string
 
-	for i, wt := range worktrees {
+	needSep := false
+	for _, wt := range worktrees {
 		if wt.IsBare {
 			continue
 		}
+		if needSep {
+			content = append(content, "")
+		}
+		needSep = true
 
 		// Branch line: "  main ✔" or "  feature/auth ● +2/-1"
 		branch := branchStyle.Render(wt.Branch)
@@ -171,10 +176,6 @@ func renderWorktreePane(worktrees []gitquery.Worktree, width, height int) []stri
 			content = append(content, "    "+commitStyle.Render(msg))
 		}
 
-		// Blank line between entries
-		if i < len(worktrees)-1 {
-			content = append(content, "")
-		}
 	}
 
 	// Truncate lines to pane width

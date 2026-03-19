@@ -100,9 +100,6 @@ func fillStatus(wt *Worktree) {
 			if line == "" {
 				continue
 			}
-			if len(line) > 60 {
-				line = line[:57] + "..."
-			}
 			wt.Unpushed = append(wt.Unpushed, line)
 		}
 	}

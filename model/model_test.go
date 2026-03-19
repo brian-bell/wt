@@ -250,6 +250,15 @@ func TestModel_ModeSwitchToWorktreesFiresFetchCmd(t *testing.T) {
 	}
 }
 
+func TestModel_Pressing1WhileInMode1NoFetch(t *testing.T) {
+	m := model.New(testRepos())
+	// Already in mode 1; pressing 1 should not fire a redundant fetch
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
+	if cmd != nil {
+		t.Error("pressing 1 while already in mode 1 should not fire fetch")
+	}
+}
+
 func TestModel_DefaultModeIsWorktrees(t *testing.T) {
 	m := model.New(testRepos())
 	if m.Mode() != 1 {

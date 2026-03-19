@@ -139,6 +139,29 @@ func TestWorktreePane_TruncatesLongCommitToWidth(t *testing.T) {
 	}
 }
 
+func TestWorktreePane_NoTrailingBlankWhenBareIsLast(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", Branch: "main", Dirty: false},
+		{Path: "/bare", Branch: "", IsBare: true},
+	}
+	lines := renderWorktreePane(wts, 50, 5)
+	// Only "main" line should be non-empty; no trailing blank separator
+	var nonEmpty int
+	for _, l := range lines {
+		if strings.TrimSpace(l) != "" {
+			nonEmpty++
+		}
+	}
+	if nonEmpty != 1 {
+		t.Errorf("expected 1 non-empty line, got %d; trailing blank from bare entry?", nonEmpty)
+	}
+	// The line immediately after "main" should be empty padding, not a separator
+	// caused by the bare entry's index check
+	if strings.TrimSpace(lines[0]) == "" {
+		t.Error("first line should be the main branch, not empty")
+	}
+}
+
 func TestRender_CombinesPanesWithDivider(t *testing.T) {
 	view := Render(RenderParams{
 		Repos:    []scanner.Repo{{Path: "/a", DisplayName: "alpha"}},
