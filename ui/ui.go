@@ -13,15 +13,17 @@ import (
 const LeftPaneWidth = 30
 
 var (
-	repoStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-	selectedStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Reverse(true)
-	placeholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true)
-	statusStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	dividerStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
-	branchStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
-	dirtyStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
-	cleanStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-	commitStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	repoStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	selectedStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Reverse(true)
+	placeholderStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true)
+	statusStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	dividerStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
+	branchStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
+	dirtyStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
+	cleanStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	commitStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	activeModeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
+	inactiveModeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
 
 // RenderParams holds everything the renderer needs.
@@ -43,7 +45,7 @@ func Render(p RenderParams) string {
 		p.Height = 24
 	}
 
-	statusBar := RenderStatusBar(p.Width)
+	statusBar := RenderStatusBar(p.Width, p.Mode)
 	contentHeight := p.Height - 1 // reserve 1 row for status bar
 
 	// Build left pane
@@ -79,8 +81,26 @@ func Render(p RenderParams) string {
 }
 
 // RenderStatusBar produces the bottom status bar.
-func RenderStatusBar(width int) string {
-	text := "  [1] worktrees  ↑/↓: navigate  1/2/3: view  q: quit"
+func RenderStatusBar(width, mode int) string {
+	modes := []struct {
+		key  string
+		name string
+	}{
+		{"1", "worktrees"},
+		{"2", "stashes"},
+		{"3", "branches"},
+	}
+
+	var parts []string
+	for _, m := range modes {
+		if fmt.Sprintf("%d", mode) == m.key {
+			parts = append(parts, activeModeStyle.Render(fmt.Sprintf("[%s] %s", m.key, m.name)))
+		} else {
+			parts = append(parts, inactiveModeStyle.Render(fmt.Sprintf(" %s %s", m.key, m.name)))
+		}
+	}
+
+	text := "  " + strings.Join(parts, " ") + "  ✔ clean  ● dirty  ↑/↓ navigate  q: quit"
 	return statusStyle.Width(width).Render(text)
 }
 

@@ -248,12 +248,41 @@ func TestModel_ViewMode2ShowsPlaceholder(t *testing.T) {
 	}
 }
 
-func TestModel_ViewStatusBarShowsModeKeys(t *testing.T) {
+func TestModel_ViewStatusBarShowsIndicatorLegend(t *testing.T) {
 	m := model.New(testRepos())
-	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
 
 	view := m.View()
-	if !strings.Contains(view, "1/2/3") {
-		t.Error("status bar should contain '1/2/3'")
+	for _, legend := range []string{"✔ clean", "● dirty"} {
+		if !strings.Contains(view, legend) {
+			t.Errorf("status bar should contain legend %q", legend)
+		}
+	}
+}
+
+func TestModel_ViewStatusBarHighlightsActiveMode(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
+
+	// Default mode 1: worktrees should be bracketed, others not
+	view := m.View()
+	if !strings.Contains(view, "[1] worktrees") {
+		t.Error("mode 1 active: status bar should contain '[1] worktrees'")
+	}
+	if strings.Contains(view, "[2]") {
+		t.Error("mode 1 active: status bar should not bracket mode 2")
+	}
+	if strings.Contains(view, "[3]") {
+		t.Error("mode 1 active: status bar should not bracket mode 3")
+	}
+
+	// Switch to mode 2
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	view = m.View()
+	if !strings.Contains(view, "[2] stashes") {
+		t.Error("mode 2 active: status bar should contain '[2] stashes'")
+	}
+	if strings.Contains(view, "[1]") {
+		t.Error("mode 2 active: status bar should not bracket mode 1")
 	}
 }
