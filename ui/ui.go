@@ -83,24 +83,24 @@ func Render(p RenderParams) string {
 // RenderStatusBar produces the bottom status bar.
 func RenderStatusBar(width, mode int) string {
 	modes := []struct {
-		key  string
+		key  int
 		name string
 	}{
-		{"1", "worktrees"},
-		{"2", "stashes"},
-		{"3", "branches"},
+		{1, "worktrees"},
+		{2, "stashes"},
+		{3, "branches"},
 	}
 
 	var parts []string
 	for _, m := range modes {
-		if fmt.Sprintf("%d", mode) == m.key {
-			parts = append(parts, activeModeStyle.Render(fmt.Sprintf("[%s] %s", m.key, m.name)))
+		if mode == m.key {
+			parts = append(parts, activeModeStyle.Render(fmt.Sprintf("[%d] %s", m.key, m.name)))
 		} else {
-			parts = append(parts, inactiveModeStyle.Render(fmt.Sprintf(" %s %s", m.key, m.name)))
+			parts = append(parts, inactiveModeStyle.Render(fmt.Sprintf(" %d %s", m.key, m.name)))
 		}
 	}
 
-	text := "  " + strings.Join(parts, " ") + "  ✔ clean  ● dirty  ↑/↓ navigate  q: quit"
+	text := "  " + strings.Join(parts, " ") + "  ✔ clean  ● dirty  ↑/↓ navigate  ←/→ mode  q/esc: quit"
 	return statusStyle.Width(width).Render(text)
 }
 
@@ -132,7 +132,7 @@ func renderRepoList(repos []scanner.Repo, selected, height int) []string {
 	return lines
 }
 
-func renderWorktreePane(worktrees []gitquery.Worktree, _, height int) []string {
+func renderWorktreePane(worktrees []gitquery.Worktree, width, height int) []string {
 	var content []string
 
 	for i, wt := range worktrees {
@@ -152,9 +152,6 @@ func renderWorktreePane(worktrees []gitquery.Worktree, _, height int) []string {
 		var upstream string
 		if wt.Ahead > 0 || wt.Behind > 0 {
 			upstream = fmt.Sprintf(" +%d/-%d", wt.Ahead, wt.Behind)
-		} else if wt.Ahead == 0 && wt.Behind == 0 && len(wt.Unpushed) == 0 {
-			// Could have upstream but be in sync, or no upstream at all.
-			// We check if there are no unpushed commits and counts are 0.
 		}
 
 		line := "  " + branch + status
@@ -180,6 +177,11 @@ func renderWorktreePane(worktrees []gitquery.Worktree, _, height int) []string {
 		}
 	}
 
+	// Truncate lines to pane width
+	for i, line := range content {
+		content[i] = truncateToWidth(line, width)
+	}
+
 	// Pad to fill height
 	lines := make([]string, height)
 	for i := 0; i < height; i++ {
@@ -190,6 +192,19 @@ func renderWorktreePane(worktrees []gitquery.Worktree, _, height int) []string {
 		}
 	}
 	return lines
+}
+
+// truncateToWidth trims a styled string to fit within maxWidth visible columns.
+func truncateToWidth(s string, maxWidth int) string {
+	if lipgloss.Width(s) <= maxWidth {
+		return s
+	}
+	// Strip ANSI, truncate runes, re-measure. Crude but correct for our use.
+	runes := []rune(s)
+	for len(runes) > 0 && lipgloss.Width(string(runes)) > maxWidth {
+		runes = runes[:len(runes)-1]
+	}
+	return string(runes)
 }
 
 func renderPlaceholderPane(width, height int) []string {

@@ -62,6 +62,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected++
 				return m, m.fetchWorktrees()
 			}
+		case "right", "l":
+			m.mode = m.mode%3 + 1
+			return m, m.fetchIfWorktrees()
+		case "left", "h":
+			m.mode = (m.mode+1)%3 + 1
+			return m, m.fetchIfWorktrees()
 		case "1":
 			m.mode = ModeWorktrees
 			return m, m.fetchWorktrees()
@@ -69,7 +75,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = ModeStashes
 		case "3":
 			m.mode = ModeBranches
-		case "q", "ctrl+c":
+		case "q", "ctrl+c", "esc":
 			return m, tea.Quit
 		}
 	case WorktreeResultMsg:
@@ -92,6 +98,13 @@ func (m Model) View() string {
 		Mode:      int(m.mode),
 		Worktrees: m.worktrees,
 	})
+}
+
+func (m Model) fetchIfWorktrees() tea.Cmd {
+	if m.mode == ModeWorktrees {
+		return m.fetchWorktrees()
+	}
+	return nil
 }
 
 func (m Model) fetchWorktrees() tea.Cmd {

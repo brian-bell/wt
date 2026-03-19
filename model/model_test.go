@@ -91,6 +91,18 @@ func TestModel_CtrlCReturnsQuitCmd(t *testing.T) {
 	}
 }
 
+func TestModel_EscReturnsQuitCmd(t *testing.T) {
+	m := model.New(testRepos())
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyEscape})
+	if cmd == nil {
+		t.Fatal("expected quit command, got nil")
+	}
+	msg := cmd()
+	if _, ok := msg.(tea.QuitMsg); !ok {
+		t.Errorf("expected tea.QuitMsg, got %T", msg)
+	}
+}
+
 func TestModel_WindowSizeUpdates(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -122,6 +134,56 @@ func TestModel_ModeSwitchOnKeyPress(t *testing.T) {
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
 	if m.Mode() != 1 {
 		t.Errorf("expected mode 1, got %d", m.Mode())
+	}
+}
+
+func TestModel_RightArrowCyclesMode(t *testing.T) {
+	m := model.New(testRepos())
+	// starts at mode 1
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
+	if m.Mode() != 2 {
+		t.Errorf("expected mode 2, got %d", m.Mode())
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
+	if m.Mode() != 3 {
+		t.Errorf("expected mode 3, got %d", m.Mode())
+	}
+	// wraps back to 1
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
+	if m.Mode() != 1 {
+		t.Errorf("expected mode 1 after wrap, got %d", m.Mode())
+	}
+}
+
+func TestModel_LeftArrowCyclesMode(t *testing.T) {
+	m := model.New(testRepos())
+	// starts at mode 1, left wraps to 3
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})
+	if m.Mode() != 3 {
+		t.Errorf("expected mode 3, got %d", m.Mode())
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})
+	if m.Mode() != 2 {
+		t.Errorf("expected mode 2, got %d", m.Mode())
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})
+	if m.Mode() != 1 {
+		t.Errorf("expected mode 1 after wrap, got %d", m.Mode())
+	}
+}
+
+func TestModel_ArrowModeSwitchFiresFetchForWorktrees(t *testing.T) {
+	m := model.New(testRepos())
+	// right from mode 1 to mode 2 — no fetch (not worktrees mode)
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRight})
+	if cmd != nil {
+		t.Error("switching to mode 2 should not fire fetch")
+	}
+	// right from mode 3 wraps to mode 1 — should fetch
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	_, cmd = update(m, tea.KeyMsg{Type: tea.KeyRight})
+	if cmd == nil {
+		t.Error("switching to mode 1 should fire fetch")
 	}
 }
 
@@ -206,7 +268,7 @@ func TestModel_ViewContainsExpectedContent(t *testing.T) {
 			t.Errorf("view should contain repo name %q", name)
 		}
 	}
-	if !strings.Contains(view, "q: quit") {
+	if !strings.Contains(view, "q/esc: quit") {
 		t.Error("view should contain quit keybinding")
 	}
 }
