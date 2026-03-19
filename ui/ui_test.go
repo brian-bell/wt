@@ -15,7 +15,7 @@ func lipglossWidth(s string) int {
 }
 
 func TestStatusBar_ActiveModeIsBracketed(t *testing.T) {
-	bar := RenderStatusBar(120, 1)
+	bar := RenderStatusBar(120, 1, 0)
 	if !strings.Contains(bar, "[1] worktrees") {
 		t.Error("active mode 1 should be bracketed")
 	}
@@ -23,7 +23,7 @@ func TestStatusBar_ActiveModeIsBracketed(t *testing.T) {
 		t.Error("inactive modes should not be bracketed")
 	}
 
-	bar = RenderStatusBar(120, 2)
+	bar = RenderStatusBar(120, 2, 0)
 	if !strings.Contains(bar, "[2] stashes") {
 		t.Error("active mode 2 should be bracketed")
 	}
@@ -33,11 +33,35 @@ func TestStatusBar_ActiveModeIsBracketed(t *testing.T) {
 }
 
 func TestStatusBar_ContainsLegend(t *testing.T) {
-	bar := RenderStatusBar(120, 1)
-	for _, legend := range []string{"✔ clean", "● dirty", "←/→ mode", "q/esc: quit"} {
+	bar := RenderStatusBar(120, 1, 0)
+	for _, legend := range []string{"✔ clean", "● dirty", "tab: mode", "q/esc: quit"} {
 		if !strings.Contains(bar, legend) {
 			t.Errorf("status bar should contain %q", legend)
 		}
+	}
+}
+
+func TestWorktreePane_NoUpstreamShowsRedDot(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", Branch: "main", HasUpstream: false},
+	}
+	lines := renderWorktreePane(wts, 50, 10)
+	joined := strings.Join(lines, "\n")
+	// Should contain the red dot indicator (● styled red)
+	if !strings.Contains(joined, "●") {
+		t.Error("no-upstream worktree should show red dot indicator")
+	}
+}
+
+func TestWorktreePane_WithUpstreamNoRedDot(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", Branch: "main", HasUpstream: true, Dirty: false},
+	}
+	lines := renderWorktreePane(wts, 50, 10)
+	joined := strings.Join(lines, "\n")
+	// Clean + has upstream → only ✔, no ●
+	if strings.Contains(joined, "●") {
+		t.Error("clean worktree with upstream should not show any dot indicator")
 	}
 }
 
