@@ -680,6 +680,35 @@ func TestListBranches_UnpushedCommits(t *testing.T) {
 	}
 }
 
+func TestListBranches_UntrackedOnlyDirtyWorktree(t *testing.T) {
+	repo := realPath(t, initBranchRepo(t))
+
+	wtDir := realPath(t, t.TempDir())
+	wtPath := filepath.Join(wtDir, "wt-untracked")
+	run(t, repo, "git", "branch", "untracked-branch")
+	run(t, repo, "git", "worktree", "add", wtPath, "untracked-branch")
+
+	// Only create an untracked file (don't stage it)
+	writeFile(t, wtPath, "untracked.txt", "new content\n")
+
+	branches, err := gitquery.ListBranches(repo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	b := findBranch(branches, "untracked-branch")
+	if b == nil {
+		t.Fatal("branch 'untracked-branch' not found")
+	}
+
+	if !b.Dirty {
+		t.Error("expected Dirty = true")
+	}
+	if b.FilesChanged != 1 {
+		t.Errorf("expected FilesChanged = 1, got %d", b.FilesChanged)
+	}
+}
+
 func TestBranchDiff_ReturnsDiffForDirtyWorktree(t *testing.T) {
 	repo := realPath(t, initBranchRepo(t))
 
@@ -690,7 +719,7 @@ func TestBranchDiff_ReturnsDiffForDirtyWorktree(t *testing.T) {
 
 	writeFile(t, wtPath, "README.md", "changed\n")
 
-	diff, err := gitquery.BranchDiff(repo, wtPath)
+	diff, err := gitquery.BranchDiff(wtPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -711,7 +740,7 @@ func TestBranchDiff_EmptyForCleanWorktree(t *testing.T) {
 	run(t, repo, "git", "branch", "clean-branch")
 	run(t, repo, "git", "worktree", "add", wtPath, "clean-branch")
 
-	diff, err := gitquery.BranchDiff(repo, wtPath)
+	diff, err := gitquery.BranchDiff(wtPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
