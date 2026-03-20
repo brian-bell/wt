@@ -12,9 +12,8 @@ import (
 type Mode int
 
 const (
-	ModeWorktrees Mode = 1
-	ModeStashes   Mode = 2
-	ModeBranches  Mode = 3
+	ModeBranches Mode = 1
+	ModeStashes  Mode = 2
 )
 
 // OverlayState represents what overlay (if any) is displayed.
@@ -61,7 +60,7 @@ type Model struct {
 
 // New creates a Model from discovered repos.
 func New(repos []scanner.Repo) Model {
-	return Model{repos: repos, mode: ModeWorktrees}
+	return Model{repos: repos, mode: ModeBranches}
 }
 
 func (m Model) Selected() int                  { return m.selected }
@@ -127,38 +126,42 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case "up", "k":
-		if m.selected > 0 {
-			m.selected--
-			return m, m.fetchForMode()
+		if m.mode == ModeStashes && m.stashSelected > 0 {
+			m.stashSelected--
 		}
 	case "down", "j":
-		if m.selected < len(m.repos)-1 {
-			m.selected++
+		if m.mode == ModeStashes && len(m.stashes) > 0 && m.stashSelected < len(m.stashes)-1 {
+			m.stashSelected++
+		}
+	case "left", "h":
+		if m.mode > ModeBranches {
+			m.mode--
+			m.stashSelected = 0
 			return m, m.fetchForMode()
 		}
 	case "right", "l":
-		if m.mode == ModeStashes && len(m.stashes) > 0 {
-			m.stashSelected = (m.stashSelected + 1) % len(m.stashes)
-		}
-	case "left", "h":
-		if m.mode == ModeStashes && len(m.stashes) > 0 {
-			m.stashSelected = (m.stashSelected - 1 + len(m.stashes)) % len(m.stashes)
+		if m.mode < ModeStashes {
+			m.mode++
+			m.stashSelected = 0
+			return m, m.fetchForMode()
 		}
 	case "1":
-		if m.mode != ModeWorktrees {
-			m.mode = ModeWorktrees
+		if m.mode != ModeBranches {
+			m.mode = ModeBranches
 			return m, m.fetchWorktrees()
 		}
 	case "2":
 		if m.mode != ModeStashes {
 			m.mode = ModeStashes
+			m.stashSelected = 0
 			return m, m.fetchStashes()
 		}
-	case "3":
-		m.mode = ModeBranches
 	case "tab":
-		m.mode = m.mode%3 + 1
-		return m, m.fetchForModeSwitch()
+		if len(m.repos) > 0 {
+			m.selected = (m.selected + 1) % len(m.repos)
+			m.stashSelected = 0
+			return m, m.fetchForMode()
+		}
 	case "enter":
 		if m.mode == ModeStashes && len(m.stashes) > 0 {
 			m.overlay = OverlayStashDiff
@@ -188,18 +191,7 @@ func (m Model) View() string {
 
 func (m Model) fetchForMode() tea.Cmd {
 	switch m.mode {
-	case ModeWorktrees:
-		return m.fetchWorktrees()
-	case ModeStashes:
-		m.stashSelected = 0
-		return m.fetchStashes()
-	}
-	return nil
-}
-
-func (m Model) fetchForModeSwitch() tea.Cmd {
-	switch m.mode {
-	case ModeWorktrees:
+	case ModeBranches:
 		return m.fetchWorktrees()
 	case ModeStashes:
 		return m.fetchStashes()

@@ -16,10 +16,10 @@ func lipglossWidth(s string) int {
 
 func TestStatusBar_ActiveModeIsBracketed(t *testing.T) {
 	bar := RenderStatusBar(120, 1, 0)
-	if !strings.Contains(bar, "[1] worktrees") {
+	if !strings.Contains(bar, "[1] branches") {
 		t.Error("active mode 1 should be bracketed")
 	}
-	if strings.Contains(bar, "[2]") || strings.Contains(bar, "[3]") {
+	if strings.Contains(bar, "[2]") {
 		t.Error("inactive modes should not be bracketed")
 	}
 
@@ -27,16 +27,32 @@ func TestStatusBar_ActiveModeIsBracketed(t *testing.T) {
 	if !strings.Contains(bar, "[2] stashes") {
 		t.Error("active mode 2 should be bracketed")
 	}
-	if strings.Contains(bar, "[1]") || strings.Contains(bar, "[3]") {
+	if strings.Contains(bar, "[1]") {
 		t.Error("inactive modes should not be bracketed")
 	}
 }
 
-func TestStatusBar_ContainsLegend(t *testing.T) {
+func TestStatusBar_Mode1ContainsIndicatorLegend(t *testing.T) {
 	bar := RenderStatusBar(120, 1, 0)
-	for _, legend := range []string{"✔ clean", "● dirty", "tab: mode", "q/esc: quit"} {
+	for _, legend := range []string{"✔ clean", "● dirty", "● no upstream"} {
 		if !strings.Contains(bar, legend) {
-			t.Errorf("status bar should contain %q", legend)
+			t.Errorf("mode 1 status bar should contain legend %q", legend)
+		}
+	}
+}
+
+func TestStatusBar_Mode2OmitsIndicatorLegend(t *testing.T) {
+	bar := RenderStatusBar(120, 2, 0)
+	if strings.Contains(bar, "clean") {
+		t.Error("mode 2 status bar should not contain indicator legend")
+	}
+}
+
+func TestStatusBar_ContainsHints(t *testing.T) {
+	bar := RenderStatusBar(120, 1, 0)
+	for _, hint := range []string{"tab: repo", "←/→: mode", "q/esc: quit"} {
+		if !strings.Contains(bar, hint) {
+			t.Errorf("status bar should contain %q", hint)
 		}
 	}
 }

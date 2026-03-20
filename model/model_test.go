@@ -32,38 +32,59 @@ func TestModel_InitialSelection(t *testing.T) {
 	}
 }
 
-func TestModel_DownArrowMovesSelection(t *testing.T) {
+func TestModel_DownArrowDoesNotMoveRepoSelection(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
-	if m.Selected() != 1 {
-		t.Errorf("expected selected 1, got %d", m.Selected())
+	if m.Selected() != 0 {
+		t.Errorf("expected selected unchanged at 0, got %d", m.Selected())
 	}
 }
 
-func TestModel_UpArrowMovesSelection(t *testing.T) {
+func TestModel_UpArrowDoesNotMoveRepoSelection(t *testing.T) {
 	m := model.New(testRepos())
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab}) // move to 1
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
+	if m.Selected() != 1 {
+		t.Errorf("expected selected unchanged at 1, got %d", m.Selected())
+	}
+}
+
+func TestModel_DownMovesStashCursorInMode2(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	if m.StashSelected() != 1 {
+		t.Errorf("expected StashSelected 1, got %d", m.StashSelected())
+	}
+}
+
+func TestModel_UpMovesStashCursorInMode2(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
-	if m.Selected() != 0 {
-		t.Errorf("expected selected 0, got %d", m.Selected())
+	if m.StashSelected() != 0 {
+		t.Errorf("expected StashSelected 0, got %d", m.StashSelected())
 	}
 }
 
-func TestModel_DownClampsAtBottom(t *testing.T) {
+func TestModel_StashCursorClampsAtBounds(t *testing.T) {
 	m := model.New(testRepos())
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
+	// Clamp at top
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
+	if m.StashSelected() != 0 {
+		t.Errorf("expected StashSelected clamped at 0, got %d", m.StashSelected())
+	}
+	// Clamp at bottom (3 stashes, max index 2)
 	for i := 0; i < 10; i++ {
 		m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
 	}
-	if m.Selected() != 2 {
-		t.Errorf("expected selected 2 (last), got %d", m.Selected())
-	}
-}
-
-func TestModel_UpClampsAtTop(t *testing.T) {
-	m := model.New(testRepos())
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
-	if m.Selected() != 0 {
-		t.Errorf("expected selected 0, got %d", m.Selected())
+	if m.StashSelected() != 2 {
+		t.Errorf("expected StashSelected clamped at 2, got %d", m.StashSelected())
 	}
 }
 
@@ -126,59 +147,69 @@ func TestModel_ModeSwitchOnKeyPress(t *testing.T) {
 		t.Errorf("expected mode 2, got %d", m.Mode())
 	}
 
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
-	if m.Mode() != 3 {
-		t.Errorf("expected mode 3, got %d", m.Mode())
-	}
-
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
 	if m.Mode() != 1 {
 		t.Errorf("expected mode 1, got %d", m.Mode())
 	}
 }
 
-func TestModel_TabCyclesMode(t *testing.T) {
+func TestModel_Key3IsNoOp(t *testing.T) {
 	m := model.New(testRepos())
-	// starts at mode 1
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
-	if m.Mode() != 2 {
-		t.Errorf("expected mode 2, got %d", m.Mode())
-	}
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
-	if m.Mode() != 3 {
-		t.Errorf("expected mode 3, got %d", m.Mode())
-	}
-	// wraps back to 1
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	if m.Mode() != 1 {
-		t.Errorf("expected mode 1 after wrap, got %d", m.Mode())
+		t.Errorf("expected mode unchanged at 1, got %d", m.Mode())
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	if m.Mode() != 2 {
+		t.Errorf("expected mode unchanged at 2, got %d", m.Mode())
 	}
 }
 
-func TestModel_TabModeSwitchFiresFetch(t *testing.T) {
+func TestModel_TabCyclesRepos(t *testing.T) {
 	m := model.New(testRepos())
-	// tab from mode 1 to mode 2 — should fire fetch (stashes)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
+	if m.Selected() != 1 {
+		t.Errorf("expected selected 1, got %d", m.Selected())
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
+	if m.Selected() != 2 {
+		t.Errorf("expected selected 2, got %d", m.Selected())
+	}
+}
+
+func TestModel_TabWrapsAtEnd(t *testing.T) {
+	m := model.New(testRepos())
+	// 3 repos: cycle past the last one
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
+	if m.Selected() != 0 {
+		t.Errorf("expected selected 0 (wrapped), got %d", m.Selected())
+	}
+}
+
+func TestModel_TabDoesNotChangeMode(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
+	if m.Mode() != 2 {
+		t.Errorf("expected mode unchanged at 2, got %d", m.Mode())
+	}
+}
+
+func TestModel_TabFiresFetchForCurrentMode(t *testing.T) {
+	m := model.New(testRepos())
+	// In mode 1 (branches), tab should fetch worktrees for new repo
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyTab})
 	if cmd == nil {
-		t.Error("switching to mode 2 should fire stash fetch")
-	}
-	// tab from mode 2 to mode 3 — no fetch (branches placeholder)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
-	_, cmd = update(m, tea.KeyMsg{Type: tea.KeyTab})
-	if cmd != nil {
-		t.Error("switching to mode 3 should not fire fetch")
-	}
-	// tab from mode 3 wraps to mode 1 — should fetch
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
-	_, cmd = update(m, tea.KeyMsg{Type: tea.KeyTab})
-	if cmd == nil {
-		t.Error("switching to mode 1 should fire fetch")
+		t.Fatal("expected fetch cmd on tab, got nil")
 	}
 }
 
 func TestModel_ModeSwitchPreservesSelection(t *testing.T) {
 	m := model.New(testRepos())
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown}) // select bravo
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab}) // select bravo
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
 	if m.Selected() != 1 {
 		t.Errorf("expected selection preserved at 1, got %d", m.Selected())
@@ -202,7 +233,7 @@ func TestModel_WorktreeResultUpdatesState(t *testing.T) {
 func TestModel_StaleWorktreeResultDiscarded(t *testing.T) {
 	m := model.New(testRepos())
 	// Move selection to bravo (index 1)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
 
 	// Send result for alpha (index 0) — stale
 	wts := []gitquery.Worktree{
@@ -211,14 +242,6 @@ func TestModel_StaleWorktreeResultDiscarded(t *testing.T) {
 	m, _ = update(m, model.WorktreeResultMsg{RepoPath: "/dev/alpha", Worktrees: wts})
 	if len(m.Worktrees()) != 0 {
 		t.Errorf("expected stale result discarded, got %d worktrees", len(m.Worktrees()))
-	}
-}
-
-func TestModel_NavKeyFiresFetchCmd(t *testing.T) {
-	m := model.New(testRepos())
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyDown})
-	if cmd == nil {
-		t.Fatal("expected fetchWorktrees cmd on down arrow, got nil")
 	}
 }
 
@@ -308,42 +331,44 @@ func TestModel_ViewMode2ShowsPlaceholder(t *testing.T) {
 	}
 }
 
-func TestModel_ViewStatusBarShowsIndicatorLegend(t *testing.T) {
+func TestModel_ViewStatusBarShowsTwoModes(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
 
 	view := m.View()
-	for _, legend := range []string{"✔ clean", "● dirty"} {
-		if !strings.Contains(view, legend) {
-			t.Errorf("status bar should contain legend %q", legend)
-		}
+	// Mode 1 active
+	if !strings.Contains(view, "[1] branches") {
+		t.Error("mode 1 active: status bar should contain '[1] branches'")
 	}
-}
-
-func TestModel_ViewStatusBarHighlightsActiveMode(t *testing.T) {
-	m := model.New(testRepos())
-	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
-
-	// Default mode 1: worktrees should be bracketed, others not
-	view := m.View()
-	if !strings.Contains(view, "[1] worktrees") {
-		t.Error("mode 1 active: status bar should contain '[1] worktrees'")
+	if !strings.Contains(view, "2 stashes") {
+		t.Error("mode 1 active: status bar should show inactive '2 stashes'")
 	}
-	if strings.Contains(view, "[2]") {
-		t.Error("mode 1 active: status bar should not bracket mode 2")
-	}
-	if strings.Contains(view, "[3]") {
-		t.Error("mode 1 active: status bar should not bracket mode 3")
+	// Should NOT contain mode 3
+	if strings.Contains(view, "[3]") || strings.Contains(view, "3 ") {
+		t.Error("status bar should not contain mode 3")
 	}
 
 	// Switch to mode 2
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
 	view = m.View()
 	if !strings.Contains(view, "[2] stashes") {
 		t.Error("mode 2 active: status bar should contain '[2] stashes'")
 	}
-	if strings.Contains(view, "[1]") {
-		t.Error("mode 2 active: status bar should not bracket mode 1")
+	if !strings.Contains(view, "1 branches") {
+		t.Error("mode 2 active: status bar should show inactive '1 branches'")
+	}
+}
+
+func TestModel_ViewStatusBarShowsKeyHints(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
+
+	view := m.View()
+	if !strings.Contains(view, "tab") {
+		t.Error("status bar should contain 'tab' hint")
+	}
+	if !strings.Contains(view, "←/→") {
+		t.Error("status bar should contain '←/→' hint")
 	}
 }
 
@@ -380,72 +405,69 @@ func TestModel_StashResultUpdatesState(t *testing.T) {
 
 func TestModel_StaleStashResultDiscarded(t *testing.T) {
 	m := model.New(testRepos())
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown}) // select bravo
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab}) // select bravo
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	if len(m.Stashes()) != 0 {
 		t.Errorf("expected stale stash result discarded, got %d stashes", len(m.Stashes()))
 	}
 }
 
-func TestModel_NavInMode2FiresFetchStashes(t *testing.T) {
+func TestModel_RightSwitchesToMode2(t *testing.T) {
 	m := model.New(testRepos())
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyDown})
-	if cmd == nil {
-		t.Fatal("expected fetch cmd on nav in mode 2, got nil")
-	}
-	msg := cmd()
-	if _, ok := msg.(model.StashResultMsg); !ok {
-		t.Errorf("expected StashResultMsg, got %T", msg)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
+	if m.Mode() != 2 {
+		t.Errorf("expected mode 2, got %d", m.Mode())
 	}
 }
 
-func TestModel_RightArrowMovesStashCursor(t *testing.T) {
+func TestModel_LeftSwitchesToMode1(t *testing.T) {
 	m := model.New(testRepos())
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
-	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
-	if m.StashSelected() != 1 {
-		t.Errorf("expected StashSelected 1, got %d", m.StashSelected())
-	}
-}
-
-func TestModel_RightArrowWrapsStashCursor(t *testing.T) {
-	m := model.New(testRepos())
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
-	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
-	// Right through all 3 stashes: 0→1→2→0
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
-	if m.StashSelected() != 2 {
-		t.Errorf("expected StashSelected 2, got %d", m.StashSelected())
-	}
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
-	if m.StashSelected() != 0 {
-		t.Errorf("expected StashSelected wrapped to 0, got %d", m.StashSelected())
-	}
-}
-
-func TestModel_LeftArrowMovesStashCursorBack(t *testing.T) {
-	m := model.New(testRepos())
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
-	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // 0→1
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // 1→2
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})  // 2→1
-	if m.StashSelected() != 1 {
-		t.Errorf("expected StashSelected 1, got %d", m.StashSelected())
-	}
-}
-
-func TestModel_LeftArrowWrapsStashCursorToBottom(t *testing.T) {
-	m := model.New(testRepos())
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
-	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
-	// At 0, left wraps to last (2)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})
-	if m.StashSelected() != 2 {
-		t.Errorf("expected StashSelected wrapped to 2, got %d", m.StashSelected())
+	if m.Mode() != 1 {
+		t.Errorf("expected mode 1, got %d", m.Mode())
+	}
+}
+
+func TestModel_HLSwitchModes(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	if m.Mode() != 2 {
+		t.Errorf("expected mode 2, got %d", m.Mode())
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
+	if m.Mode() != 1 {
+		t.Errorf("expected mode 1, got %d", m.Mode())
+	}
+}
+
+func TestModel_ModeClampsAtEdges(t *testing.T) {
+	m := model.New(testRepos())
+	// Already at mode 1, left should stay at 1
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})
+	if m.Mode() != 1 {
+		t.Errorf("expected mode 1 (clamped), got %d", m.Mode())
+	}
+	// Go to mode 2, right should stay at 2
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
+	if m.Mode() != 2 {
+		t.Errorf("expected mode 2 (clamped), got %d", m.Mode())
+	}
+}
+
+func TestModel_ModeSwitchViaArrowFiresFetch(t *testing.T) {
+	m := model.New(testRepos())
+	// Right to mode 2 should fetch stashes
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRight})
+	if cmd == nil {
+		t.Fatal("expected fetch cmd on mode switch to 2, got nil")
+	}
+	// Left back to mode 1 should fetch worktrees
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
+	_, cmd = update(m, tea.KeyMsg{Type: tea.KeyLeft})
+	if cmd == nil {
+		t.Fatal("expected fetch cmd on mode switch to 1, got nil")
 	}
 }
 
@@ -582,13 +604,13 @@ func TestModel_ViewOverlayShowsDiff(t *testing.T) {
 func TestModel_StatusBarMode2ShowsStashKeys(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // mode 2
 
 	view := m.View()
-	if !strings.Contains(view, "←/→") {
-		t.Error("mode 2 status bar should mention '←/→' for stash navigation")
-	}
 	if !strings.Contains(view, "enter") {
 		t.Error("mode 2 status bar should mention 'enter'")
+	}
+	if !strings.Contains(view, "↑/↓") {
+		t.Error("mode 2 status bar should mention '↑/↓'")
 	}
 }
