@@ -217,7 +217,7 @@ func ListBranches(repoPath string) ([]Branch, error) {
 
 // BranchDiff returns the diff output for a worktree.
 func BranchDiff(worktreePath string) (string, error) {
-	return gitCmd(worktreePath, "diff")
+	return gitCmd(worktreePath, "diff", "HEAD")
 }
 
 // branchWorktreeMap returns a map of branch name -> worktree path.

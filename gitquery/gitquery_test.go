@@ -718,6 +718,8 @@ func TestBranchDiff_ReturnsDiffForDirtyWorktree(t *testing.T) {
 	run(t, repo, "git", "worktree", "add", wtPath, "diff-branch")
 
 	writeFile(t, wtPath, "README.md", "changed\n")
+	writeFile(t, wtPath, "staged.txt", "staged content\n")
+	run(t, wtPath, "git", "add", "staged.txt")
 
 	diff, err := gitquery.BranchDiff(wtPath)
 	if err != nil {
@@ -728,7 +730,10 @@ func TestBranchDiff_ReturnsDiffForDirtyWorktree(t *testing.T) {
 		t.Error("expected diff output to contain 'diff --git'")
 	}
 	if !strings.Contains(diff, "changed") {
-		t.Error("expected diff output to contain the changed content")
+		t.Error("expected diff output to contain unstaged changes")
+	}
+	if !strings.Contains(diff, "staged content") {
+		t.Error("expected diff output to contain staged changes")
 	}
 }
 
