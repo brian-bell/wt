@@ -106,9 +106,8 @@ func RenderStatusBar(width, mode, overlay int) string {
 		key  int
 		name string
 	}{
-		{1, "worktrees"},
+		{1, "branches"},
 		{2, "stashes"},
-		{3, "branches"},
 	}
 
 	var parts []string
@@ -124,9 +123,9 @@ func RenderStatusBar(width, mode, overlay int) string {
 	if overlay != 0 {
 		hints = "  ↑/↓ scroll  esc: close"
 	} else if mode == 2 {
-		hints = "  ↑/↓ navigate  ←/→ stash  enter: diff  tab: mode  q/esc: quit"
+		hints = "  ↑/↓ select  enter: diff  tab: repo  ←/→: mode  q/esc: quit"
 	} else {
-		hints = "  " + cleanStyle.Render("✔") + " clean  " + dirtyStyle.Render("●") + " dirty  " + noUpstreamStyle.Render("●") + " no upstream  ↑/↓ navigate  tab: mode  q/esc: quit"
+		hints = "  tab: repo  ←/→: mode  q/esc: quit"
 	}
 
 	text := "  " + strings.Join(parts, " ") + hints
