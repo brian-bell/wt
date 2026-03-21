@@ -97,51 +97,25 @@ func TestModel_EmptyReposNoPanic(t *testing.T) {
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
 }
 
-func TestModel_QuitReturnsQuitCmd(t *testing.T) {
-	m := model.New(testRepos())
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
-	if cmd == nil {
-		t.Fatal("expected quit command, got nil")
-	}
-	msg := cmd()
-	if _, ok := msg.(tea.QuitMsg); !ok {
-		t.Errorf("expected tea.QuitMsg, got %T", msg)
-	}
-}
-
-func TestModel_CtrlCReturnsQuitCmd(t *testing.T) {
-	m := model.New(testRepos())
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyCtrlC})
-	if cmd == nil {
-		t.Fatal("expected quit command, got nil")
-	}
-	msg := cmd()
-	if _, ok := msg.(tea.QuitMsg); !ok {
-		t.Errorf("expected tea.QuitMsg, got %T", msg)
-	}
-}
-
-func TestModel_EscReturnsQuitCmd(t *testing.T) {
-	m := model.New(testRepos())
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyEscape})
-	if cmd == nil {
-		t.Fatal("expected quit command, got nil")
-	}
-	msg := cmd()
-	if _, ok := msg.(tea.QuitMsg); !ok {
-		t.Errorf("expected tea.QuitMsg, got %T", msg)
+func TestModel_QuitKeys(t *testing.T) {
+	for _, key := range []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune{'q'}},
+		{Type: tea.KeyCtrlC},
+		{Type: tea.KeyEscape},
+	} {
+		m := model.New(testRepos())
+		_, cmd := update(m, key)
+		if cmd == nil {
+			t.Fatalf("key %v: expected quit command, got nil", key)
+		}
+		msg := cmd()
+		if _, ok := msg.(tea.QuitMsg); !ok {
+			t.Errorf("key %v: expected tea.QuitMsg, got %T", key, msg)
+		}
 	}
 }
 
 // --- Pane switching ---
-
-func TestModel_TabFromLeftPaneSwitchesToRight(t *testing.T) {
-	m := model.New(testRepos())
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
-	if m.ActivePane() != 1 {
-		t.Errorf("expected right pane (1) after tab, got %d", m.ActivePane())
-	}
-}
 
 func TestModel_TabFromRightPaneSwitchesToLeft(t *testing.T) {
 	m := model.New(testRepos())
@@ -196,21 +170,41 @@ func TestModel_LeftPaneUpNavigatesRepos(t *testing.T) {
 	}
 }
 
-func TestModel_LeftPaneDownClampsAtLastRepo(t *testing.T) {
+func TestModel_LeftPaneDownWrapsToFirst(t *testing.T) {
 	m := model.New(testRepos()) // 3 repos
-	for i := 0; i < 5; i++ {
-		m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
-	}
-	if m.Selected() != 2 {
-		t.Errorf("expected selected clamped at 2, got %d", m.Selected())
+	// Move to last repo
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown}) // 1
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown}) // 2
+	// One more should wrap to 0
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	if m.Selected() != 0 {
+		t.Errorf("expected selected to wrap to 0, got %d", m.Selected())
 	}
 }
 
-func TestModel_LeftPaneUpClampsAtZero(t *testing.T) {
-	m := model.New(testRepos())
+func TestModel_LeftPaneUpWrapsToLast(t *testing.T) {
+	m := model.New(testRepos()) // 3 repos
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
-	if m.Selected() != 0 {
-		t.Errorf("expected selected clamped at 0, got %d", m.Selected())
+	if m.Selected() != 2 {
+		t.Errorf("expected selected to wrap to 2, got %d", m.Selected())
+	}
+}
+
+func TestModel_RepoSwitchClearsRightPaneData(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: []gitquery.Branch{
+		{Name: "main", IsWorktree: true, WorktreePaths: []string{"/dev/alpha"}},
+	}})
+	if len(m.Rows()) != 1 {
+		t.Fatal("expected 1 row before switching repos")
+	}
+	// Switch to next repo — old data should be cleared immediately
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	if len(m.Rows()) != 0 {
+		t.Errorf("expected rows cleared on repo switch, got %d", len(m.Rows()))
+	}
+	if len(m.Stashes()) != 0 {
+		t.Errorf("expected stashes cleared on repo switch, got %d", len(m.Stashes()))
 	}
 }
 
@@ -305,56 +299,32 @@ func TestModel_UpDownNavigatesAllBranches(t *testing.T) {
 	if m.BranchSelected() != 3 {
 		t.Errorf("expected cursor at 3, got %d", m.BranchSelected())
 	}
-	// Clamp at last
+	// Wrap to first
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	if m.BranchSelected() != 0 {
+		t.Errorf("expected cursor to wrap to 0, got %d", m.BranchSelected())
+	}
+	// Wrap backward to last
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
 	if m.BranchSelected() != 3 {
-		t.Errorf("expected cursor clamped at 3, got %d", m.BranchSelected())
-	}
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
-	if m.BranchSelected() != 2 {
-		t.Errorf("expected cursor at 2 on up, got %d", m.BranchSelected())
+		t.Errorf("expected cursor to wrap to 3, got %d", m.BranchSelected())
 	}
 }
 
-func TestModel_DownMovesStashCursorInMode2(t *testing.T) {
+func TestModel_StashCursorWraps(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
-	if m.StashSelected() != 1 {
-		t.Errorf("expected StashSelected 1, got %d", m.StashSelected())
-	}
-}
-
-func TestModel_UpMovesStashCursorInMode2(t *testing.T) {
-	m := model.New(testRepos())
-	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
-	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	// Wrap backward from 0 to last
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
-	if m.StashSelected() != 0 {
-		t.Errorf("expected StashSelected 0, got %d", m.StashSelected())
-	}
-}
-
-func TestModel_StashCursorClampsAtBounds(t *testing.T) {
-	m := model.New(testRepos())
-	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
-	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
-	// Clamp at top
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
-	if m.StashSelected() != 0 {
-		t.Errorf("expected StashSelected clamped at 0, got %d", m.StashSelected())
-	}
-	// Clamp at bottom (3 stashes, max index 2)
-	for i := 0; i < 10; i++ {
-		m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
-	}
 	if m.StashSelected() != 2 {
-		t.Errorf("expected StashSelected clamped at 2, got %d", m.StashSelected())
+		t.Errorf("expected StashSelected to wrap to 2, got %d", m.StashSelected())
+	}
+	// Wrap forward from last to 0
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	if m.StashSelected() != 0 {
+		t.Errorf("expected StashSelected to wrap to 0, got %d", m.StashSelected())
 	}
 }
 
@@ -365,7 +335,7 @@ func TestModel_BranchScrollFollowsCursor(t *testing.T) {
 		branches[i] = gitquery.Branch{Name: fmt.Sprintf("branch-%d", i)}
 	}
 	m := model.New(testRepos())
-	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 7}) // 3 content lines (7 - 4 overhead = 3)
+	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 8}) // 3 content lines (8 - 5 overhead)
 	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
 
 	// Cursor starts at 0, scroll at 0

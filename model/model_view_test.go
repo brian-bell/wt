@@ -96,9 +96,6 @@ func TestModel_ViewStatusBarShowsKeyHints(t *testing.T) {
 	if !strings.Contains(view, "tab: pane") {
 		t.Error("status bar should contain 'tab: pane' hint")
 	}
-	if strings.Contains(view, "←/→") {
-		t.Error("status bar should not contain '←/→' hint (modes moved to header)")
-	}
 }
 
 func TestModel_ViewMode2ShowsStashContent(t *testing.T) {

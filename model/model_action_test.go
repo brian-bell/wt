@@ -582,10 +582,10 @@ func TestModel_MultiWorktreeExpandsToRows(t *testing.T) {
 	if m.BranchSelected() != 1 {
 		t.Errorf("expected cursor at 1 after down, got %d", m.BranchSelected())
 	}
-	// Another down should clamp at 1 (only 2 rows total)
+	// Another down should wrap to 0 (only 2 rows total)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
-	if m.BranchSelected() != 1 {
-		t.Errorf("expected cursor clamped at 1, got %d", m.BranchSelected())
+	if m.BranchSelected() != 0 {
+		t.Errorf("expected cursor to wrap to 0, got %d", m.BranchSelected())
 	}
 }
 

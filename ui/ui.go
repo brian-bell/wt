@@ -68,7 +68,7 @@ func Render(p RenderParams) string {
 		return renderOverlay(p)
 	}
 
-	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay)
+	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay, p.ActivePane)
 
 	// Border colors based on active pane
 	activeBorderColor := lipgloss.Color("12")
@@ -82,49 +82,52 @@ func Render(p RenderParams) string {
 		rightBorderColor = activeBorderColor
 	}
 
-	// Left pane: L/T/B borders (no right border)
-	// Border takes 1 char left, 1 char top, 1 char bottom
-	leftContentWidth := LeftPaneWidth - 1 // 1 for left border
-	innerHeight := p.Height - 1 - 2       // 1 status bar + 2 top/bottom borders
+	leftContentWidth := LeftPaneWidth - 2 // left + right border
+	innerHeight := p.Height - 3           // status bar + top/bottom borders
 
-	leftLines := renderRepoList(p.Repos, p.Selected, innerHeight)
+	leftLines := renderRepoList(p.Repos, p.Selected, leftContentWidth, innerHeight)
 	leftContent := strings.Join(leftLines, "\n")
 	leftPane := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, false, true, true).
+		Border(lipgloss.NormalBorder()).
 		BorderForeground(leftBorderColor).
 		Width(leftContentWidth).
 		Height(innerHeight).
 		Render(leftContent)
 
-	// Right pane: full 4-sided border
-	// Border takes 2 chars horizontal (left + right)
-	rightContentWidth := p.Width - LeftPaneWidth - 2
+	rightContentWidth := p.Width - LeftPaneWidth - 2 // left + right border
 	if rightContentWidth < 0 {
 		rightContentWidth = 0
 	}
 
-	// Mode header as first line inside right pane
-	modeHeader := renderModeHeader(p.Mode)
-	rightContentHeight := innerHeight - 1 // 1 for mode header
+	modeHeader := renderModeHeader(p.Mode, rightContentWidth)
+	rightContentHeight := innerHeight - 2 // mode header + separator
 
 	var repoPath string
 	if p.Selected < len(p.Repos) {
 		repoPath = p.Repos[p.Selected].Path
 	}
 
+	// Hide cursor in right pane when left pane is active
+	branchSel := p.BranchSelected
+	stashSel := p.StashSelected
+	if p.ActivePane == 0 {
+		branchSel = -1
+		stashSel = -1
+	}
+
 	var rightLines []string
 	switch {
 	case p.Mode == 1 && len(p.Branches) > 0:
-		rightLines = renderBranchPaneSelected(p.Branches, p.BranchSelected, p.BranchScroll, rightContentWidth, rightContentHeight, repoPath)
+		rightLines = renderBranchPaneSelected(p.Branches, branchSel, p.BranchScroll, rightContentWidth, rightContentHeight, repoPath)
 	case p.Mode == 2 && len(p.Stashes) > 0:
-		rightLines = renderStashPane(p.Stashes, p.StashSelected, rightContentWidth, rightContentHeight)
+		rightLines = renderStashPane(p.Stashes, stashSel, rightContentWidth, rightContentHeight)
 	default:
 		rightLines = renderPlaceholderPane(rightContentWidth, rightContentHeight)
 	}
 
 	rightContent := modeHeader + "\n" + strings.Join(rightLines, "\n")
 	rightPane := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, true, true, true).
+		Border(lipgloss.NormalBorder()).
 		BorderForeground(rightBorderColor).
 		Width(rightContentWidth).
 		Height(innerHeight).
@@ -136,7 +139,7 @@ func Render(p RenderParams) string {
 }
 
 // renderModeHeader produces the mode selector line shown at the top of the right pane.
-func renderModeHeader(mode int) string {
+func renderModeHeader(mode, width int) string {
 	modes := []struct {
 		key  int
 		name string
@@ -153,26 +156,32 @@ func renderModeHeader(mode int) string {
 			parts = append(parts, inactiveModeStyle.Render(fmt.Sprintf(" %d %s", m.key, m.name)))
 		}
 	}
-	return " " + strings.Join(parts, " ")
+	line := " " + strings.Join(parts, " ")
+	separator := strings.Repeat("─", width)
+	return line + "\n" + separator
 }
 
 // RenderStatusBar produces the bottom status bar (hints only, no mode tabs).
-func RenderStatusBar(width, mode, overlay int) string {
+func RenderStatusBar(width, mode, overlay, activePane int) string {
 	var hints string
 	if overlay == 3 {
 		hints = "  y: confirm  n/esc: cancel"
 	} else if overlay != 0 {
 		hints = "  ↑/↓ scroll  esc: close"
 	} else if mode == 2 {
-		hints = "  ↑/↓ select  enter: diff  d: drop  tab: pane  q/esc: quit"
+		hints = "  tab: pane  q/esc: quit  ↑/↓ select  enter: diff  d: drop"
 	} else {
-		hints = " " + cleanStyle.Render("✔") + " clean " + aheadBehindStyle.Render("●") + " ahead/behind " + dirtyRedStyle.Render("●") + " dirty " + noUpstreamStyle.Render("●") + " no upstream  t: terminal  c: code  d: delete  tab: pane  q/esc: quit"
+		keys := "  |  tab: pane  q/esc: quit"
+		if activePane == 1 {
+			keys += "  t: terminal  c: code  d: delete"
+		}
+		hints = " " + cleanStyle.Render("✔") + " clean  " + aheadBehindStyle.Render("●") + " ahead/behind  " + dirtyRedStyle.Render("●") + " dirty  " + noUpstreamStyle.Render("●") + " no upstream" + keys
 	}
 
 	return statusStyle.Width(width).Render(hints)
 }
 
-func renderRepoList(repos []scanner.Repo, selected, height int) []string {
+func renderRepoList(repos []scanner.Repo, selected, width, height int) []string {
 	lines := make([]string, height)
 
 	start := 0
@@ -186,13 +195,13 @@ func renderRepoList(repos []scanner.Repo, selected, height int) []string {
 			name := repos[idx].DisplayName
 			if idx == selected {
 				line := fmt.Sprintf(" > %s", name)
-				lines[i] = selectedStyle.Width(LeftPaneWidth).Render(line)
+				lines[i] = selectedStyle.Width(width).Render(line)
 			} else {
 				line := fmt.Sprintf("   %s", name)
-				lines[i] = repoStyle.Width(LeftPaneWidth).Render(line)
+				lines[i] = repoStyle.Width(width).Render(line)
 			}
 		} else {
-			lines[i] = strings.Repeat(" ", LeftPaneWidth)
+			lines[i] = strings.Repeat(" ", width)
 		}
 	}
 
@@ -232,15 +241,15 @@ func renderBranchPaneSelected(rows []gitquery.BranchRow, selected, scroll, width
 		var locationLabel string
 		if row.WorktreePath != "" {
 			if repoPath != "" && row.WorktreePath == repoPath {
-				locationLabel = commitStyle.Render("[root]") + " "
+				locationLabel = " " + commitStyle.Render("[root]")
 			} else {
-				locationLabel = commitStyle.Render(fmt.Sprintf("[%s]", row.WorktreePath)) + " "
+				locationLabel = " " + commitStyle.Render(fmt.Sprintf("[%s]", row.WorktreePath))
 			}
 		}
 
-		line := "  " + locationLabel + branch + indicators
+		line := "   " + branch + indicators + locationLabel
 		if i == selected {
-			line = branchSelStyle.Render(" > " + strings.TrimPrefix(line, "  "))
+			line = branchSelStyle.Render(" > " + strings.TrimPrefix(line, "   "))
 		}
 		content = append(content, line)
 
@@ -285,7 +294,7 @@ func renderStashPane(stashes []gitquery.Stash, selected, width, height int) []st
 
 		dateStr := stashDateStyle.Render(date)
 		msgStr := stashMsgStyle.Render(s.Message)
-		line := fmt.Sprintf("  %s  %s", dateStr, msgStr)
+		line := fmt.Sprintf("   %s  %s", dateStr, msgStr)
 
 		if i == selected {
 			line = stashSelStyle.Width(width).Render(fmt.Sprintf(" > %s  %s", date, s.Message))
@@ -300,7 +309,7 @@ func renderStashPane(stashes []gitquery.Stash, selected, width, height int) []st
 }
 
 func renderOverlay(p RenderParams) string {
-	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay)
+	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay, p.ActivePane)
 	contentHeight := p.Height - 1
 
 	// Confirmation dialog overlay

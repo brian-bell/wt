@@ -31,48 +31,40 @@ const (
 
 // --- Messages ---
 
-// BranchResultMsg is sent when branch data is fetched asynchronously.
 type BranchResultMsg struct {
 	RepoPath string
 	Branches []gitquery.Branch
 }
 
-// StashResultMsg is sent when stash data is fetched asynchronously.
 type StashResultMsg struct {
 	RepoPath string
 	Stashes  []gitquery.Stash
 }
 
-// StashDiffResultMsg is sent when a stash diff is fetched asynchronously.
 type StashDiffResultMsg struct {
 	RepoPath string
 	Index    int
 	Diff     string
 }
 
-// BranchDiffResultMsg is sent when a branch diff is fetched asynchronously.
 type BranchDiffResultMsg struct {
 	RepoPath   string
 	BranchName string
 	Diff       string
 }
 
-// WorktreeRemovedMsg is sent when a worktree removal completes.
 type WorktreeRemovedMsg struct {
 	RepoPath string
 }
 
-// BranchDeletedMsg is sent when a branch deletion completes.
 type BranchDeletedMsg struct {
 	RepoPath string
 }
 
-// StashDroppedMsg is sent when a stash drop completes.
 type StashDroppedMsg struct {
 	RepoPath string
 }
 
-// DeleteFailedMsg is sent when a delete operation fails and a force retry is available.
 type DeleteFailedMsg struct {
 	RepoPath    string
 	Target      string       // worktree path or branch name
@@ -210,14 +202,22 @@ func (m Model) handleLeftPaneKey(key string) (tea.Model, tea.Cmd) {
 	case "tab":
 		m.activePane = 1
 	case "up", "k":
-		if len(m.repos) > 0 && m.selected > 0 {
-			m.selected--
+		if len(m.repos) > 0 {
+			if m.selected > 0 {
+				m.selected--
+			} else {
+				m.selected = len(m.repos) - 1
+			}
 			m.resetRightPaneCursors()
 			return m, m.fetchForMode()
 		}
 	case "down", "j":
-		if len(m.repos) > 0 && m.selected < len(m.repos)-1 {
-			m.selected++
+		if len(m.repos) > 0 {
+			if m.selected < len(m.repos)-1 {
+				m.selected++
+			} else {
+				m.selected = 0
+			}
 			m.resetRightPaneCursors()
 			return m, m.fetchForMode()
 		}
@@ -297,25 +297,41 @@ func (m Model) handleRightPaneKey(key string) (tea.Model, tea.Cmd) {
 // --- Cursor navigation ---
 
 func (m Model) handleCursorUp() (tea.Model, tea.Cmd) {
-	if m.mode == ModeBranches && len(m.rows) > 0 && m.branchSelected > 0 {
-		m.branchSelected--
+	if m.mode == ModeBranches && len(m.rows) > 0 {
+		if m.branchSelected > 0 {
+			m.branchSelected--
+		} else {
+			m.branchSelected = len(m.rows) - 1
+		}
 		m = m.ensureBranchVisible()
 		return m, nil
 	}
-	if m.mode == ModeStashes && m.stashSelected > 0 {
-		m.stashSelected--
+	if m.mode == ModeStashes && len(m.stashes) > 0 {
+		if m.stashSelected > 0 {
+			m.stashSelected--
+		} else {
+			m.stashSelected = len(m.stashes) - 1
+		}
 	}
 	return m, nil
 }
 
 func (m Model) handleCursorDown() (tea.Model, tea.Cmd) {
-	if m.mode == ModeBranches && len(m.rows) > 0 && m.branchSelected < len(m.rows)-1 {
-		m.branchSelected++
+	if m.mode == ModeBranches && len(m.rows) > 0 {
+		if m.branchSelected < len(m.rows)-1 {
+			m.branchSelected++
+		} else {
+			m.branchSelected = 0
+		}
 		m = m.ensureBranchVisible()
 		return m, nil
 	}
-	if m.mode == ModeStashes && len(m.stashes) > 0 && m.stashSelected < len(m.stashes)-1 {
-		m.stashSelected++
+	if m.mode == ModeStashes && len(m.stashes) > 0 {
+		if m.stashSelected < len(m.stashes)-1 {
+			m.stashSelected++
+		} else {
+			m.stashSelected = 0
+		}
 	}
 	return m, nil
 }
@@ -434,6 +450,8 @@ func (m *Model) resetRightPaneCursors() {
 	m.branchSelected = 0
 	m.stashSelected = 0
 	m.branchScroll = 0
+	m.rows = nil
+	m.stashes = nil
 }
 
 // --- Message handlers ---
@@ -604,7 +622,7 @@ func (m Model) isSelectedBranchDirtyWorktree() bool {
 }
 
 func (m Model) ensureBranchVisible() Model {
-	contentHeight := m.height - 4 // 1 status bar + 2 borders + 1 mode header
+	contentHeight := m.height - 5 // status bar + borders + mode header with separator
 	if contentHeight <= 0 {
 		contentHeight = 16
 	}
