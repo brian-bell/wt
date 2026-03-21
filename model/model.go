@@ -189,10 +189,10 @@ func (m Model) handleConfirmKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "y", "enter":
 		action := m.confirmAction
-		m.clearConfirm()
+		m = m.clearConfirm()
 		return m, action()
 	case "n", "q", "esc":
-		m.clearConfirm()
+		m = m.clearConfirm()
 	}
 	return m, nil
 }
@@ -208,7 +208,7 @@ func (m Model) handleLeftPaneKey(key string) (tea.Model, tea.Cmd) {
 			} else {
 				m.selected = len(m.repos) - 1
 			}
-			m.resetRightPaneCursors()
+			m = m.resetRightPaneCursors()
 			return m, m.fetchForMode()
 		}
 	case "down", "j":
@@ -218,7 +218,7 @@ func (m Model) handleLeftPaneKey(key string) (tea.Model, tea.Cmd) {
 			} else {
 				m.selected = 0
 			}
-			m.resetRightPaneCursors()
+			m = m.resetRightPaneCursors()
 			return m, m.fetchForMode()
 		}
 	case "q", "ctrl+c", "esc":
@@ -286,8 +286,6 @@ func (m Model) handleRightPaneKey(key string) (tea.Model, tea.Cmd) {
 		return m.handleOpenTerminal()
 	case "c":
 		return m.handleOpenCode()
-	case "r":
-		return m, m.fetchForMode()
 	case "q", "ctrl+c", "esc":
 		return m, tea.Quit
 	}
@@ -439,19 +437,21 @@ func (m Model) confirmBranchDelete() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) clearConfirm() {
+func (m Model) clearConfirm() Model {
 	m.overlay = OverlayNone
 	m.confirmPrompt = ""
 	m.confirmAction = nil
 	m.confirmForce = false
+	return m
 }
 
-func (m *Model) resetRightPaneCursors() {
+func (m Model) resetRightPaneCursors() Model {
 	m.branchSelected = 0
 	m.stashSelected = 0
 	m.branchScroll = 0
 	m.rows = nil
 	m.stashes = nil
+	return m
 }
 
 // --- Message handlers ---
@@ -622,7 +622,7 @@ func (m Model) isSelectedBranchDirtyWorktree() bool {
 }
 
 func (m Model) ensureBranchVisible() Model {
-	contentHeight := m.height - 5 // status bar + borders + mode header with separator
+	contentHeight := m.height - ui.BranchContentOverhead
 	if contentHeight <= 0 {
 		contentHeight = 16
 	}

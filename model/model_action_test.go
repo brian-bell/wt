@@ -612,32 +612,3 @@ func TestModel_DKeyOnExpansionRowTargetsSpecificPath(t *testing.T) {
 		t.Errorf("d on expansion row should not mention /dev/feat-A, got prompt: %q", prompt)
 	}
 }
-
-// --- Refresh ---
-
-func TestModel_RKeyRefreshesBranchesInMode1(t *testing.T) {
-	m := model.New(testRepos())
-	m = inRightPane(m)
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
-	if cmd == nil {
-		t.Fatal("expected fetch cmd on r, got nil")
-	}
-	msg := cmd()
-	if _, ok := msg.(model.BranchResultMsg); !ok {
-		t.Errorf("expected BranchResultMsg on r in mode 1, got %T", msg)
-	}
-}
-
-func TestModel_RKeyRefreshesStashesInMode2(t *testing.T) {
-	m := model.New(testRepos())
-	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
-	if cmd == nil {
-		t.Fatal("expected fetch cmd on r in mode 2, got nil")
-	}
-	msg := cmd()
-	if _, ok := msg.(model.StashResultMsg); !ok {
-		t.Errorf("expected StashResultMsg on r in mode 2, got %T", msg)
-	}
-}

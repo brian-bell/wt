@@ -49,7 +49,6 @@ The UI has two panes: repos on the left, content on the right. `tab` switches fo
 | `d` | Delete branch/worktree or drop stash (with confirmation) |
 | `t` | Open terminal at worktree path |
 | `c` | Open VSCode at worktree path |
-| `r` | Refresh current mode data |
 | `tab` | Switch focus to left pane |
 | `q`/`esc` | Close overlay or quit |
 

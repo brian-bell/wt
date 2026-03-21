@@ -9,6 +9,7 @@ import (
 	"github.com/brian-bell/wt/gitquery"
 	"github.com/brian-bell/wt/model"
 	"github.com/brian-bell/wt/scanner"
+	"github.com/brian-bell/wt/ui"
 )
 
 // --- Shared helpers ---
@@ -251,7 +252,6 @@ func TestModel_LeftPaneActionKeysAreNoOps(t *testing.T) {
 		{Type: tea.KeyRunes, Runes: []rune{'d'}},
 		{Type: tea.KeyRunes, Runes: []rune{'t'}},
 		{Type: tea.KeyRunes, Runes: []rune{'c'}},
-		{Type: tea.KeyRunes, Runes: []rune{'r'}},
 	} {
 		_, cmd := update(m, key)
 		if cmd != nil {
@@ -335,7 +335,7 @@ func TestModel_BranchScrollFollowsCursor(t *testing.T) {
 		branches[i] = gitquery.Branch{Name: fmt.Sprintf("branch-%d", i)}
 	}
 	m := model.New(testRepos())
-	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 8}) // 3 content lines (8 - 5 overhead)
+	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: ui.BranchContentOverhead + 3}) // 3 content lines
 	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
 
 	// Cursor starts at 0, scroll at 0

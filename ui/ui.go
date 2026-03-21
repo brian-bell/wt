@@ -12,6 +12,12 @@ import (
 
 const LeftPaneWidth = 30
 
+// BranchContentOverhead is the number of rows consumed by chrome around the
+// branch list: status bar (1) + top/bottom borders (2) + mode header with
+// separator (2). Both the model (ensureBranchVisible) and the renderer use
+// this constant so they stay in sync.
+const BranchContentOverhead = 5
+
 var (
 	repoStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
 	selectedStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Reverse(true)
@@ -100,7 +106,7 @@ func Render(p RenderParams) string {
 	}
 
 	modeHeader := renderModeHeader(p.Mode, rightContentWidth)
-	rightContentHeight := innerHeight - 2 // mode header + separator
+	rightContentHeight := p.Height - BranchContentOverhead
 
 	var repoPath string
 	if p.Selected < len(p.Repos) {
