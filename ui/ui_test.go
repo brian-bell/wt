@@ -10,7 +10,7 @@ import (
 )
 
 func TestStatusBar_ActiveModeIsBracketed(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, false)
+	bar := RenderStatusBar(120, 1, 0)
 	if !strings.Contains(bar, "[1] branches") {
 		t.Error("active mode 1 should be bracketed")
 	}
@@ -18,7 +18,7 @@ func TestStatusBar_ActiveModeIsBracketed(t *testing.T) {
 		t.Error("inactive modes should not be bracketed")
 	}
 
-	bar = RenderStatusBar(120, 2, 0, false)
+	bar = RenderStatusBar(120, 2, 0)
 	if !strings.Contains(bar, "[2] stashes") {
 		t.Error("active mode 2 should be bracketed")
 	}
@@ -28,7 +28,7 @@ func TestStatusBar_ActiveModeIsBracketed(t *testing.T) {
 }
 
 func TestStatusBar_Mode1ContainsIndicatorLegend(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, false)
+	bar := RenderStatusBar(120, 1, 0)
 	for _, legend := range []string{"✔ clean", "● ahead/behind", "● dirty", "● no upstream"} {
 		if !strings.Contains(bar, legend) {
 			t.Errorf("mode 1 status bar should contain legend %q", legend)
@@ -37,14 +37,14 @@ func TestStatusBar_Mode1ContainsIndicatorLegend(t *testing.T) {
 }
 
 func TestStatusBar_Mode2OmitsIndicatorLegend(t *testing.T) {
-	bar := RenderStatusBar(120, 2, 0, false)
+	bar := RenderStatusBar(120, 2, 0)
 	if strings.Contains(bar, "clean") {
 		t.Error("mode 2 status bar should not contain indicator legend")
 	}
 }
 
 func TestStatusBar_ContainsHints(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, false)
+	bar := RenderStatusBar(120, 1, 0)
 	for _, hint := range []string{"tab: repo", "←/→: mode", "q/esc: quit"} {
 		if !strings.Contains(bar, hint) {
 			t.Errorf("status bar should contain %q", hint)
@@ -378,27 +378,20 @@ func TestRender_ForceConfirmDialogShowsPrompt(t *testing.T) {
 }
 
 func TestStatusBar_ShowsRefreshHint(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, false)
+	bar := RenderStatusBar(120, 1, 0)
 	if !strings.Contains(bar, "r: refresh") {
 		t.Errorf("status bar should contain 'r: refresh', got: %q", bar)
 	}
-	bar = RenderStatusBar(120, 2, 0, false)
+	bar = RenderStatusBar(120, 2, 0)
 	if !strings.Contains(bar, "r: refresh") {
 		t.Errorf("mode 2 status bar should contain 'r: refresh', got: %q", bar)
 	}
 }
 
-func TestStatusBar_ShowsDeleteHintWhenCanDelete(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, true)
+func TestStatusBar_ShowsDeleteHintInMode1(t *testing.T) {
+	bar := RenderStatusBar(120, 1, 0)
 	if !strings.Contains(bar, "d: delete") {
-		t.Errorf("status bar should contain 'd: delete' when canDelete=true, got: %q", bar)
-	}
-}
-
-func TestStatusBar_NoDeleteHintWhenCannotDelete(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, false)
-	if strings.Contains(bar, "d: delete") {
-		t.Error("status bar should not contain 'd: delete' when canDelete=false")
+		t.Errorf("mode 1 status bar should always contain 'd: delete', got: %q", bar)
 	}
 }
 

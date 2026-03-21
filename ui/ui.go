@@ -37,22 +37,21 @@ var (
 
 // RenderParams holds everything the renderer needs.
 type RenderParams struct {
-	Repos               []scanner.Repo
-	Selected            int
-	Width               int
-	Height              int
-	Mode                int
-	Branches            []gitquery.BranchRow
-	Stashes             []gitquery.Stash
-	BranchSelected      int
-	StashSelected       int
-	Overlay             int
-	OverlayDiff         string
-	OverlayScroll       int
-	ConfirmPrompt       string
-	ConfirmForce        bool
-	HasWorktreeSelected bool
-	BranchScroll        int
+	Repos          []scanner.Repo
+	Selected       int
+	Width          int
+	Height         int
+	Mode           int
+	Branches       []gitquery.BranchRow
+	Stashes        []gitquery.Stash
+	BranchSelected int
+	StashSelected  int
+	Overlay        int
+	OverlayDiff    string
+	OverlayScroll  int
+	ConfirmPrompt  string
+	ConfirmForce   bool
+	BranchScroll   int
 }
 
 // Render produces the full terminal view string.
@@ -69,7 +68,7 @@ func Render(p RenderParams) string {
 		return renderOverlay(p)
 	}
 
-	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay, p.HasWorktreeSelected)
+	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay)
 	contentHeight := p.Height - 1 // reserve 1 row for status bar
 
 	// Build left pane
@@ -108,7 +107,7 @@ func Render(p RenderParams) string {
 }
 
 // RenderStatusBar produces the bottom status bar.
-func RenderStatusBar(width, mode, overlay int, hasWorktreeSelected bool) string {
+func RenderStatusBar(width, mode, overlay int) string {
 	modes := []struct {
 		key  int
 		name string
@@ -134,11 +133,7 @@ func RenderStatusBar(width, mode, overlay int, hasWorktreeSelected bool) string 
 	} else if mode == 2 {
 		hints = "  ↑/↓ select  enter: diff  tab: repo  ←/→: mode  r: refresh  q/esc: quit"
 	} else {
-		hints = "  ↑/↓ enter  " + cleanStyle.Render("✔") + " clean  " + aheadBehindStyle.Render("●") + " ahead/behind  " + dirtyRedStyle.Render("●") + " dirty  " + noUpstreamStyle.Render("●") + " no upstream"
-		if hasWorktreeSelected {
-			hints += "  d: delete"
-		}
-		hints += "  r: refresh  tab: repo  ←/→: mode  q/esc: quit"
+		hints = "  ↑/↓ enter  " + cleanStyle.Render("✔") + " clean  " + aheadBehindStyle.Render("●") + " ahead/behind  " + dirtyRedStyle.Render("●") + " dirty  " + noUpstreamStyle.Render("●") + " no upstream  d: delete  r: refresh  tab: repo  ←/→: mode  q/esc: quit"
 	}
 
 	text := "  " + strings.Join(parts, " ") + hints
@@ -269,7 +264,7 @@ func renderStashPane(stashes []gitquery.Stash, selected, width, height int) []st
 }
 
 func renderOverlay(p RenderParams) string {
-	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay, p.HasWorktreeSelected)
+	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay)
 	contentHeight := p.Height - 1
 
 	// Confirmation dialog overlay

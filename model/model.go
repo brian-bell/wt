@@ -331,22 +331,21 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) View() string {
 	return ui.Render(ui.RenderParams{
-		Repos:               m.repos,
-		Selected:            m.selected,
-		Width:               m.width,
-		Height:              m.height,
-		Mode:                int(m.mode),
-		Branches:            m.rows,
-		Stashes:             m.stashes,
-		BranchSelected:      m.branchSelected,
-		StashSelected:       m.stashSelected,
-		Overlay:             int(m.overlay),
-		OverlayDiff:         m.overlayDiff,
-		OverlayScroll:       m.overlayScroll,
-		ConfirmPrompt:       m.confirmPrompt,
-		ConfirmForce:        m.confirmForce,
-		HasWorktreeSelected: len(m.rows) > 0 && m.mode == ModeBranches,
-		BranchScroll:        m.branchScroll,
+		Repos:          m.repos,
+		Selected:       m.selected,
+		Width:          m.width,
+		Height:         m.height,
+		Mode:           int(m.mode),
+		Branches:       m.rows,
+		Stashes:        m.stashes,
+		BranchSelected: m.branchSelected,
+		StashSelected:  m.stashSelected,
+		Overlay:        int(m.overlay),
+		OverlayDiff:    m.overlayDiff,
+		OverlayScroll:  m.overlayScroll,
+		ConfirmPrompt:  m.confirmPrompt,
+		ConfirmForce:   m.confirmForce,
+		BranchScroll:   m.branchScroll,
 	})
 }
 
