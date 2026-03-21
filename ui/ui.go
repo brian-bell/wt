@@ -80,10 +80,15 @@ func Render(p RenderParams) string {
 		rightWidth = 0
 	}
 
+	var repoPath string
+	if p.Selected < len(p.Repos) {
+		repoPath = p.Repos[p.Selected].Path
+	}
+
 	var rightLines []string
 	switch {
 	case p.Mode == 1 && len(p.Branches) > 0:
-		rightLines = renderBranchPaneSelected(p.Branches, p.BranchSelected, p.BranchScroll, rightWidth, contentHeight)
+		rightLines = renderBranchPaneSelected(p.Branches, p.BranchSelected, p.BranchScroll, rightWidth, contentHeight, repoPath)
 	case p.Mode == 2 && len(p.Stashes) > 0:
 		rightLines = renderStashPane(p.Stashes, p.StashSelected, rightWidth, contentHeight)
 	default:
@@ -133,7 +138,7 @@ func RenderStatusBar(width, mode, overlay int) string {
 	} else if mode == 2 {
 		hints = "  ↑/↓ select  enter: diff  d: drop  tab: repo  ←/→: mode  r: refresh  q/esc: quit"
 	} else {
-		hints = "  ↑/↓ enter  " + cleanStyle.Render("✔") + " clean  " + aheadBehindStyle.Render("●") + " ahead/behind  " + dirtyRedStyle.Render("●") + " dirty  " + noUpstreamStyle.Render("●") + " no upstream  d: delete  r: refresh  tab: repo  ←/→: mode  q/esc: quit"
+		hints = "  ↑/↓ enter  " + cleanStyle.Render("✔") + " clean  " + aheadBehindStyle.Render("●") + " ahead/behind  " + dirtyRedStyle.Render("●") + " dirty  " + noUpstreamStyle.Render("●") + " no upstream  t: terminal  c: code  d: delete  r: refresh  tab: repo  ←/→: mode  q/esc: quit"
 	}
 
 	text := "  " + strings.Join(parts, " ") + hints
@@ -168,10 +173,10 @@ func renderRepoList(repos []scanner.Repo, selected, height int) []string {
 }
 
 func renderBranchPane(rows []gitquery.BranchRow, width, height int) []string {
-	return renderBranchPaneSelected(rows, 0, 0, width, height)
+	return renderBranchPaneSelected(rows, 0, 0, width, height, "")
 }
 
-func renderBranchPaneSelected(rows []gitquery.BranchRow, selected, scroll, width, height int) []string {
+func renderBranchPaneSelected(rows []gitquery.BranchRow, selected, scroll, width, height int, repoPath string) []string {
 	var content []string
 
 	for i, row := range rows {
@@ -197,12 +202,16 @@ func renderBranchPaneSelected(rows []gitquery.BranchRow, selected, scroll, width
 			indicators = cleanStyle.Render(" ✔")
 		}
 
-		var annotation string
+		var locationLabel string
 		if row.WorktreePath != "" {
-			annotation = " " + commitStyle.Render(fmt.Sprintf("[%s]", row.WorktreePath))
+			if repoPath != "" && row.WorktreePath == repoPath {
+				locationLabel = commitStyle.Render("[root]") + " "
+			} else {
+				locationLabel = commitStyle.Render(fmt.Sprintf("[%s]", row.WorktreePath)) + " "
+			}
 		}
 
-		line := "  " + branch + indicators + annotation
+		line := "  " + locationLabel + branch + indicators
 		if i == selected {
 			line = branchSelStyle.Render(" > " + strings.TrimPrefix(line, "  "))
 		}

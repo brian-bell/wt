@@ -30,3 +30,13 @@ func DropStash(repoPath string, index int) error {
 	ref := fmt.Sprintf("stash@{%d}", index)
 	return exec.Command("git", "-C", repoPath, "stash", "drop", ref).Run()
 }
+
+// OpenTerminal opens a new Terminal window at the given path.
+func OpenTerminal(path string) error {
+	return exec.Command("open", "-a", "Terminal", path).Run()
+}
+
+// OpenVSCode opens VSCode at the given path.
+func OpenVSCode(path string) error {
+	return exec.Command("code", path).Run()
+}

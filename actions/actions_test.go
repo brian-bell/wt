@@ -174,3 +174,18 @@ func TestDropStash_Error(t *testing.T) {
 		t.Error("expected error for nonexistent repo, got nil")
 	}
 }
+
+func TestOpenTerminal_Error(t *testing.T) {
+	err := actions.OpenTerminal("/nonexistent/path/that/does/not/exist")
+	if err == nil {
+		t.Error("expected error for nonexistent path, got nil")
+	}
+}
+
+func TestOpenVSCode_RunsWithoutPanic(t *testing.T) {
+	if _, err := exec.LookPath("code"); err != nil {
+		t.Skip("code not in PATH")
+	}
+	// code exits 0 for any path; just verify no panic
+	_ = actions.OpenVSCode(t.TempDir())
+}
