@@ -264,7 +264,7 @@ func TestRender_HighlightsSecondBranch(t *testing.T) {
 		},
 		BranchSelected: 1,
 	})
-	if !strings.Contains(view, "> dirty") {
+	if !strings.Contains(view, "> [root] dirty") {
 		t.Error("dirty branch should be highlighted when BranchSelected=1")
 	}
 	if strings.Contains(view, "> clean") {
@@ -319,7 +319,7 @@ func TestBranchPane_ScrollsToSelectedBranch(t *testing.T) {
 		rows[i] = gitquery.BranchRow{Branch: gitquery.Branch{Name: fmt.Sprintf("branch-%d", i)}}
 	}
 	// BranchScroll=8 with height=3 means we see branches 8 and 9
-	lines := renderBranchPaneSelected(rows, 9, 8, 60, 3)
+	lines := renderBranchPaneSelected(rows, 9, 8, 60, 3, "")
 	joined := strings.Join(lines, "\n")
 	if !strings.Contains(joined, "branch-9") {
 		t.Error("should show branch-9 when scrolled to see it")
@@ -413,5 +413,51 @@ func TestBranchPane_MultiWorktreeExpandsRows(t *testing.T) {
 	// Unpushed commit should appear once (on first row), not on expansion row
 	if strings.Count(joined, "Fix thing") != 1 {
 		t.Errorf("unpushed commit should appear exactly once, got %d", strings.Count(joined, "Fix thing"))
+	}
+}
+
+func TestBranchPane_MainWorktreeShowsRootLabel(t *testing.T) {
+	rows := []gitquery.BranchRow{
+		{Branch: gitquery.Branch{Name: "main", HasUpstream: true, IsWorktree: true}, WorktreePath: "/dev/alpha"},
+	}
+	lines := renderBranchPaneSelected(rows, 0, 0, 80, 10, "/dev/alpha")
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "[root]") {
+		t.Errorf("main worktree branch should show [root] label, got: %q", joined)
+	}
+}
+
+func TestBranchPane_AdditionalWorktreeShowsPath(t *testing.T) {
+	rows := []gitquery.BranchRow{
+		{Branch: gitquery.Branch{Name: "feat", HasUpstream: true, IsWorktree: true}, WorktreePath: "/dev/alpha-worktrees/feat"},
+	}
+	lines := renderBranchPaneSelected(rows, 0, 0, 80, 10, "/dev/alpha")
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "/dev/alpha-worktrees/feat") {
+		t.Errorf("additional worktree branch should show path, got: %q", joined)
+	}
+	if strings.Contains(joined, "[root]") {
+		t.Error("additional worktree branch should not show [root]")
+	}
+}
+
+func TestBranchPane_NonWorktreeBranchShowsNoLabel(t *testing.T) {
+	rows := []gitquery.BranchRow{
+		{Branch: gitquery.Branch{Name: "stale", HasUpstream: true}, WorktreePath: ""},
+	}
+	lines := renderBranchPaneSelected(rows, 0, 0, 80, 10, "/dev/alpha")
+	joined := strings.Join(lines, "\n")
+	if strings.Contains(joined, "[root]") {
+		t.Error("non-worktree branch should not show [root]")
+	}
+}
+
+func TestStatusBar_Mode1ShowsOpenHints(t *testing.T) {
+	bar := RenderStatusBar(120, 1, 0)
+	if !strings.Contains(bar, "t: terminal") {
+		t.Errorf("mode 1 status bar should contain 't: terminal', got: %q", bar)
+	}
+	if !strings.Contains(bar, "c: code") {
+		t.Errorf("mode 1 status bar should contain 'c: code', got: %q", bar)
 	}
 }

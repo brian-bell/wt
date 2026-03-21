@@ -1233,3 +1233,59 @@ func TestModel_StatusBarMode2ShowsDropHint(t *testing.T) {
 		t.Error("mode 2 status bar should mention 'd: drop'")
 	}
 }
+
+func TestModel_TKey_WorktreeBranch_FiresCmd(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, model.BranchResultMsg{
+		RepoPath: "/dev/alpha",
+		Branches: []gitquery.Branch{
+			{Name: "main", IsWorktree: true, WorktreePaths: []string{"/dev/alpha"}},
+		},
+	})
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
+	if cmd == nil {
+		t.Error("expected non-nil cmd when pressing t on a worktree branch")
+	}
+}
+
+func TestModel_CKey_WorktreeBranch_FiresCmd(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, model.BranchResultMsg{
+		RepoPath: "/dev/alpha",
+		Branches: []gitquery.Branch{
+			{Name: "main", IsWorktree: true, WorktreePaths: []string{"/dev/alpha"}},
+		},
+	})
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	if cmd == nil {
+		t.Error("expected non-nil cmd when pressing c on a worktree branch")
+	}
+}
+
+func TestModel_TKey_NonWorktreeBranch_NoCmd(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, model.BranchResultMsg{
+		RepoPath: "/dev/alpha",
+		Branches: []gitquery.Branch{
+			{Name: "stale-branch"},
+		},
+	})
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
+	if cmd != nil {
+		t.Error("expected nil cmd when pressing t on a non-worktree branch")
+	}
+}
+
+func TestModel_CKey_NonWorktreeBranch_NoCmd(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, model.BranchResultMsg{
+		RepoPath: "/dev/alpha",
+		Branches: []gitquery.Branch{
+			{Name: "stale-branch"},
+		},
+	})
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	if cmd != nil {
+		t.Error("expected nil cmd when pressing c on a non-worktree branch")
+	}
+}

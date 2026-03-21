@@ -345,6 +345,20 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.overlay = OverlayConfirm
 		}
+	case "t":
+		if m.mode == ModeBranches && len(m.repos) > 0 {
+			if row, ok := m.selectedRow(); ok && row.WorktreePath != "" {
+				path := row.WorktreePath
+				return m, func() tea.Msg { _ = actions.OpenTerminal(path); return nil }
+			}
+		}
+	case "c":
+		if m.mode == ModeBranches && len(m.repos) > 0 {
+			if row, ok := m.selectedRow(); ok && row.WorktreePath != "" {
+				path := row.WorktreePath
+				return m, func() tea.Msg { _ = actions.OpenVSCode(path); return nil }
+			}
+		}
 	case "r":
 		return m, m.fetchForMode()
 	case "q", "ctrl+c", "esc":
