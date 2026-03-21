@@ -9,21 +9,14 @@ import (
 	"github.com/brian-bell/wt/scanner"
 )
 
-func TestStatusBar_ActiveModeIsBracketed(t *testing.T) {
+func TestStatusBar_NoModeSection(t *testing.T) {
+	// Modes moved to right pane header — status bar should not contain mode tabs
 	bar := RenderStatusBar(120, 1, 0)
-	if !strings.Contains(bar, "[1] branches") {
-		t.Error("active mode 1 should be bracketed")
+	if strings.Contains(bar, "[1] branches") {
+		t.Error("status bar should not contain mode tabs (moved to right pane header)")
 	}
-	if strings.Contains(bar, "[2]") {
-		t.Error("inactive modes should not be bracketed")
-	}
-
-	bar = RenderStatusBar(120, 2, 0)
-	if !strings.Contains(bar, "[2] stashes") {
-		t.Error("active mode 2 should be bracketed")
-	}
-	if strings.Contains(bar, "[1]") {
-		t.Error("inactive modes should not be bracketed")
+	if strings.Contains(bar, "2 stashes") {
+		t.Error("status bar should not contain mode tabs (moved to right pane header)")
 	}
 }
 
@@ -45,10 +38,41 @@ func TestStatusBar_Mode2OmitsIndicatorLegend(t *testing.T) {
 
 func TestStatusBar_ContainsHints(t *testing.T) {
 	bar := RenderStatusBar(120, 1, 0)
-	for _, hint := range []string{"tab: repo", "←/→: mode", "q/esc: quit"} {
+	for _, hint := range []string{"tab: pane", "q/esc: quit"} {
 		if !strings.Contains(bar, hint) {
 			t.Errorf("status bar should contain %q", hint)
 		}
+	}
+	// Mode hints removed (modes now in right pane header)
+	if strings.Contains(bar, "←/→: mode") {
+		t.Error("status bar should not contain '←/→: mode' (modes moved to header)")
+	}
+}
+
+func TestModeHeader_ShowsActiveMode(t *testing.T) {
+	header := renderModeHeader(1)
+	if !strings.Contains(header, "[1] branches") {
+		t.Error("mode header should show active mode 1 bracketed")
+	}
+	if strings.Contains(header, "[2]") {
+		t.Error("inactive mode 2 should not be bracketed")
+	}
+	header = renderModeHeader(2)
+	if !strings.Contains(header, "[2] stashes") {
+		t.Error("mode header should show active mode 2 bracketed")
+	}
+}
+
+func TestRender_ModeHeaderInRightPane(t *testing.T) {
+	view := Render(RenderParams{
+		Repos:    []scanner.Repo{{Path: "/a", DisplayName: "alpha"}},
+		Selected: 0,
+		Width:    80,
+		Height:   10,
+		Mode:     1,
+	})
+	if !strings.Contains(view, "[1] branches") {
+		t.Error("render should contain mode header '[1] branches' in right pane")
 	}
 }
 
@@ -377,14 +401,10 @@ func TestRender_ForceConfirmDialogShowsPrompt(t *testing.T) {
 	}
 }
 
-func TestStatusBar_ShowsRefreshHint(t *testing.T) {
+func TestStatusBar_NoRefreshHint(t *testing.T) {
 	bar := RenderStatusBar(120, 1, 0)
-	if !strings.Contains(bar, "r: refresh") {
-		t.Errorf("status bar should contain 'r: refresh', got: %q", bar)
-	}
-	bar = RenderStatusBar(120, 2, 0)
-	if !strings.Contains(bar, "r: refresh") {
-		t.Errorf("mode 2 status bar should contain 'r: refresh', got: %q", bar)
+	if strings.Contains(bar, "r: refresh") {
+		t.Error("status bar should not contain 'r: refresh'")
 	}
 }
 

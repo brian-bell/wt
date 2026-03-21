@@ -17,7 +17,6 @@ var (
 	selectedStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Reverse(true)
 	placeholderStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true)
 	statusStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	dividerStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
 	branchStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
 	cleanStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
 	commitStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
@@ -52,6 +51,7 @@ type RenderParams struct {
 	ConfirmPrompt  string
 	ConfirmForce   bool
 	BranchScroll   int
+	ActivePane     int
 }
 
 // Render produces the full terminal view string.
@@ -69,16 +69,43 @@ func Render(p RenderParams) string {
 	}
 
 	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay)
-	contentHeight := p.Height - 1 // reserve 1 row for status bar
 
-	// Build left pane
-	leftLines := renderRepoList(p.Repos, p.Selected, contentHeight)
+	// Border colors based on active pane
+	activeBorderColor := lipgloss.Color("12")
+	inactiveBorderColor := lipgloss.Color("238")
 
-	// Build right pane
-	rightWidth := p.Width - LeftPaneWidth - 1 // 1 for divider
-	if rightWidth < 0 {
-		rightWidth = 0
+	leftBorderColor := inactiveBorderColor
+	rightBorderColor := inactiveBorderColor
+	if p.ActivePane == 0 {
+		leftBorderColor = activeBorderColor
+	} else {
+		rightBorderColor = activeBorderColor
 	}
+
+	// Left pane: L/T/B borders (no right border)
+	// Border takes 1 char left, 1 char top, 1 char bottom
+	leftContentWidth := LeftPaneWidth - 1 // 1 for left border
+	innerHeight := p.Height - 1 - 2       // 1 status bar + 2 top/bottom borders
+
+	leftLines := renderRepoList(p.Repos, p.Selected, innerHeight)
+	leftContent := strings.Join(leftLines, "\n")
+	leftPane := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, false, true, true).
+		BorderForeground(leftBorderColor).
+		Width(leftContentWidth).
+		Height(innerHeight).
+		Render(leftContent)
+
+	// Right pane: full 4-sided border
+	// Border takes 2 chars horizontal (left + right)
+	rightContentWidth := p.Width - LeftPaneWidth - 2
+	if rightContentWidth < 0 {
+		rightContentWidth = 0
+	}
+
+	// Mode header as first line inside right pane
+	modeHeader := renderModeHeader(p.Mode)
+	rightContentHeight := innerHeight - 1 // 1 for mode header
 
 	var repoPath string
 	if p.Selected < len(p.Repos) {
@@ -88,31 +115,28 @@ func Render(p RenderParams) string {
 	var rightLines []string
 	switch {
 	case p.Mode == 1 && len(p.Branches) > 0:
-		rightLines = renderBranchPaneSelected(p.Branches, p.BranchSelected, p.BranchScroll, rightWidth, contentHeight, repoPath)
+		rightLines = renderBranchPaneSelected(p.Branches, p.BranchSelected, p.BranchScroll, rightContentWidth, rightContentHeight, repoPath)
 	case p.Mode == 2 && len(p.Stashes) > 0:
-		rightLines = renderStashPane(p.Stashes, p.StashSelected, rightWidth, contentHeight)
+		rightLines = renderStashPane(p.Stashes, p.StashSelected, rightContentWidth, rightContentHeight)
 	default:
-		rightLines = renderPlaceholderPane(rightWidth, contentHeight)
+		rightLines = renderPlaceholderPane(rightContentWidth, rightContentHeight)
 	}
 
-	// Build divider
-	divider := make([]string, contentHeight)
-	for i := range divider {
-		divider[i] = dividerStyle.Render("│")
-	}
+	rightContent := modeHeader + "\n" + strings.Join(rightLines, "\n")
+	rightPane := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, true, true, true).
+		BorderForeground(rightBorderColor).
+		Width(rightContentWidth).
+		Height(innerHeight).
+		Render(rightContent)
 
-	// Combine panes
-	left := strings.Join(leftLines, "\n")
-	mid := strings.Join(divider, "\n")
-	right := strings.Join(rightLines, "\n")
-
-	content := lipgloss.JoinHorizontal(lipgloss.Top, left, mid, right)
+	content := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
 
 	return content + "\n" + statusBar
 }
 
-// RenderStatusBar produces the bottom status bar.
-func RenderStatusBar(width, mode, overlay int) string {
+// renderModeHeader produces the mode selector line shown at the top of the right pane.
+func renderModeHeader(mode int) string {
 	modes := []struct {
 		key  int
 		name string
@@ -129,20 +153,23 @@ func RenderStatusBar(width, mode, overlay int) string {
 			parts = append(parts, inactiveModeStyle.Render(fmt.Sprintf(" %d %s", m.key, m.name)))
 		}
 	}
+	return " " + strings.Join(parts, " ")
+}
 
+// RenderStatusBar produces the bottom status bar (hints only, no mode tabs).
+func RenderStatusBar(width, mode, overlay int) string {
 	var hints string
 	if overlay == 3 {
 		hints = "  y: confirm  n/esc: cancel"
 	} else if overlay != 0 {
 		hints = "  ↑/↓ scroll  esc: close"
 	} else if mode == 2 {
-		hints = "  ↑/↓ select  enter: diff  d: drop  tab: repo  ←/→: mode  r: refresh  q/esc: quit"
+		hints = "  ↑/↓ select  enter: diff  d: drop  tab: pane  q/esc: quit"
 	} else {
-		hints = "  ↑/↓ enter  " + cleanStyle.Render("✔") + " clean  " + aheadBehindStyle.Render("●") + " ahead/behind  " + dirtyRedStyle.Render("●") + " dirty  " + noUpstreamStyle.Render("●") + " no upstream  t: terminal  c: code  d: delete  r: refresh  tab: repo  ←/→: mode  q/esc: quit"
+		hints = " " + cleanStyle.Render("✔") + " clean " + aheadBehindStyle.Render("●") + " ahead/behind " + dirtyRedStyle.Render("●") + " dirty " + noUpstreamStyle.Render("●") + " no upstream  t: terminal  c: code  d: delete  tab: pane  q/esc: quit"
 	}
 
-	text := "  " + strings.Join(parts, " ") + hints
-	return statusStyle.Width(width).Render(text)
+	return statusStyle.Width(width).Render(hints)
 }
 
 func renderRepoList(repos []scanner.Repo, selected, height int) []string {
