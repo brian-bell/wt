@@ -6,10 +6,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/brian-bell/wt/gitquery"
-	"github.com/brian-bell/wt/model"
-	"github.com/brian-bell/wt/scanner"
-	"github.com/brian-bell/wt/ui"
+	"github.com/brian-bell/wtui/gitquery"
+	"github.com/brian-bell/wtui/model"
+	"github.com/brian-bell/wtui/scanner"
+	"github.com/brian-bell/wtui/ui"
 )
 
 // --- Shared helpers ---

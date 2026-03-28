@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-make build          # Build binary to bin/wt
+make build          # Build binary to bin/wtui
 make test           # Run all tests
 make run            # Build and run the TUI
 go test ./scanner   # Run tests for a single package
@@ -18,7 +18,7 @@ Go TUI for managing git worktrees across repositories. Uses **Bubble Tea** (MVC 
 
 **Data flow:** `main` reads `WORKTREE_ROOT` env var → `scanner.Scan()` discovers repos → `model.New(repos)` creates Bubble Tea model → `Init()` fires async `fetchBranches` → `ui.Render()` draws two-pane layout.
 
-- **`cmd/wt/main.go`** — Entry point. Wires scanner output into the Bubble Tea program (alt-screen mode).
+- **`cmd/wtui/main.go`** — Entry point. Wires scanner output into the Bubble Tea program (alt-screen mode).
 - **`actions/`** — Executes git operations. `RemoveWorktree`/`ForceRemoveWorktree` run `git worktree remove` (with/without `--force`). `DeleteBranch`/`ForceDeleteBranch` run `git branch -d`/`-D`. `DropStash` runs `git stash drop stash@{N}`. `OpenTerminal(path)` runs `open -a Terminal <path>`. `OpenVSCode(path)` runs `code <path>`.
 - **`scanner/`** — Discovers git repos under `WORKTREE_ROOT` (default `~/dev`), up to 2 levels deep. Excludes `*-worktrees` dirs. Detects both `.git` dirs and `.git` files (worktree markers). Returns repos sorted case-insensitively.
 - **`gitquery/`** — Queries git data. `ListBranches(repoPath)` uses `git for-each-ref` to discover all local branches, then per branch queries upstream status, ahead/behind counts, unpushed commits, and worktree dirty status (files changed, lines added/deleted). Branches can carry multiple worktree paths. `BranchDiff(worktreePath)` returns `git diff HEAD` for a worktree. `ListStashes(repoPath)` runs `git stash list --format=%gd%x00%ai%x00%s`. `StashDiff(repoPath, index)` runs `git stash show -p stash@{N}`. Only list-level failures are hard errors; per-item failures silently default to zero values.

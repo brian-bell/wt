@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brian-bell/wt/gitquery"
-	"github.com/brian-bell/wt/scanner"
+	"github.com/brian-bell/wtui/gitquery"
+	"github.com/brian-bell/wtui/scanner"
 )
 
 func TestStatusBar_Mode1ContainsIndicatorLegend(t *testing.T) {

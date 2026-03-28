@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brian-bell/wt/actions"
+	"github.com/brian-bell/wtui/actions"
 )
 
 func mustRun(t *testing.T, dir string, args ...string) {

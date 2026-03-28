@@ -6,8 +6,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/brian-bell/wt/gitquery"
-	"github.com/brian-bell/wt/model"
+	"github.com/brian-bell/wtui/gitquery"
+	"github.com/brian-bell/wtui/model"
 )
 
 // --- Branch diff (enter key) ---

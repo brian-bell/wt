@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brian-bell/wt/gitquery"
+	"github.com/brian-bell/wtui/gitquery"
 )
 
 // realPath resolves symlinks (macOS /var → /private/var).

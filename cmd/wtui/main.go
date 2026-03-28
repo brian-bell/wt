@@ -6,8 +6,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/brian-bell/wt/model"
-	"github.com/brian-bell/wt/scanner"
+	"github.com/brian-bell/wtui/model"
+	"github.com/brian-bell/wtui/scanner"
 )
 
 func main() {
