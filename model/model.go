@@ -174,19 +174,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
+	if m.overlay == OverlayConfirm {
+		return m.handleConfirmKey(key)
+	}
+	if m.overlay != OverlayNone {
+		if m.activePane == 0 {
+			return m.handleLeftPaneKey(key)
+		}
+		return m.handleOverlayKey(key)
+	}
+
 	if key == "D" {
 		m.destructive = !m.destructive
 		return m, nil
 	}
 
-	if m.overlay == OverlayConfirm {
-		return m.handleConfirmKey(key)
-	}
 	if m.activePane == 0 {
 		return m.handleLeftPaneKey(key)
-	}
-	if m.overlay != OverlayNone {
-		return m.handleOverlayKey(key)
 	}
 	return m.handleRightPaneKey(key)
 }

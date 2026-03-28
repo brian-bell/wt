@@ -294,6 +294,41 @@ func TestModel_DestructivePersistsAcrossRepoSwitch(t *testing.T) {
 	}
 }
 
+func TestModel_ShiftDNoOpDuringConfirmOverlay(t *testing.T) {
+	m := modelWithWorktreeBranch()
+	// Open confirm dialog
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if m.Overlay() != model.OverlayConfirm {
+		t.Fatal("expected OverlayConfirm")
+	}
+	// Shift+D should be ignored while confirm is active
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	if !m.Destructive() {
+		t.Error("expected destructive to remain true during confirm overlay")
+	}
+}
+
+func TestModel_ShiftDNoOpDuringDiffOverlay(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, model.BranchResultMsg{
+		RepoPath: "/dev/alpha",
+		Branches: []gitquery.Branch{
+			{Name: "feat", IsWorktree: true, Dirty: true, WorktreePaths: []string{"/dev/alpha/feat"}},
+		},
+	})
+	m = inRightPane(m)
+	// Open diff overlay
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.Overlay() == model.OverlayNone {
+		t.Fatal("expected a diff overlay")
+	}
+	// Not in destructive mode; Shift+D should be ignored
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	if m.Destructive() {
+		t.Error("expected destructive to remain false during diff overlay")
+	}
+}
+
 // --- Confirmation dialog + delete ---
 
 func worktreeBranch() gitquery.Branch {
