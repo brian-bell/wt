@@ -1,4 +1,4 @@
-# wt
+# wtui
 
 A terminal UI for managing git worktrees across repositories.
 
@@ -7,21 +7,21 @@ A terminal UI for managing git worktrees across repositories.
 ## Install
 
 ```bash
-git clone https://github.com/brian-bell/wt.git
-cd wt
+git clone https://github.com/brian-bell/wtui.git
+cd wtui
 make build
 ```
 
-The binary is built to `bin/wt`.
+The binary is built to `bin/wtui`.
 
 ## Usage
 
 ```bash
 # Run with default root (~/dev)
-./bin/wt
+./bin/wtui
 
 # Run with a custom root
-WORKTREE_ROOT=~/projects ./bin/wt
+WORKTREE_ROOT=~/projects ./bin/wtui
 ```
 
 ### Keys
@@ -78,7 +78,7 @@ Browse stashes for the selected repo. Use `↑`/`↓` to select a stash, `enter`
 ## Development
 
 ```bash
-make build   # Build binary to bin/wt
+make build   # Build binary to bin/wtui
 make test    # Run all tests
 make run     # Build and run
 make tidy    # go mod tidy

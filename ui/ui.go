@@ -6,8 +6,8 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/brian-bell/wt/gitquery"
-	"github.com/brian-bell/wt/scanner"
+	"github.com/brian-bell/wtui/gitquery"
+	"github.com/brian-bell/wtui/scanner"
 )
 
 const LeftPaneWidth = 30

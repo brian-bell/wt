@@ -1,4 +1,4 @@
-module github.com/brian-bell/wt
+module github.com/brian-bell/wtui
 
 go 1.26.1
 

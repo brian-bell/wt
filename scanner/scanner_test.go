@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/brian-bell/wt/scanner"
+	"github.com/brian-bell/wtui/scanner"
 )
 
 func makeRepo(t *testing.T, path string) {

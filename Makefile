@@ -1,10 +1,10 @@
 BIN_DIR  = bin
-BINARY   = $(BIN_DIR)/wt
+BINARY   = $(BIN_DIR)/wtui
 
 .PHONY: build test run clean tidy
 
 build:
-	go build -o $(BINARY) ./cmd/wt
+	go build -o $(BINARY) ./cmd/wtui
 
 test:
 	go test ./...
