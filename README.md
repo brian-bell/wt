@@ -28,12 +28,15 @@ WORKTREE_ROOT=~/projects ./bin/wtui
 
 The UI has two panes: repos on the left, content on the right. `tab` switches focus between them. The active pane is highlighted with a blue border.
 
+**Destructive mode:** The app starts in read-only mode — deletion keys are disabled. Press `D` (Shift+D) to toggle destructive mode on/off. When active, the right pane border turns red and delete/drop hints appear in red as a visual warning.
+
 **Left pane (repos)**
 
 | Key | Action |
 |-----|--------|
 | `↑`/`k` | Select previous repo |
 | `↓`/`j` | Select next repo |
+| `D` | Toggle destructive mode |
 | `tab` | Switch focus to right pane |
 | `q`/`esc` | Quit |
 
@@ -46,9 +49,10 @@ The UI has two panes: repos on the left, content on the right. `tab` switches fo
 | `1`/`2` | Switch to branches / stashes mode |
 | `←`/`h`/`→`/`l` | Switch mode |
 | `enter` | View diff (dirty branch or stash) |
-| `d` | Delete branch/worktree or drop stash (with confirmation) |
+| `d` | Delete branch/worktree or drop stash — requires destructive mode |
 | `t` | Open terminal at worktree path |
 | `c` | Open VSCode at worktree path |
+| `D` | Toggle destructive mode |
 | `tab` | Switch focus to left pane |
 | `q`/`esc` | Close overlay or quit |
 
@@ -63,11 +67,11 @@ The right pane shows all local branches alphabetically with stacking indicators:
 - `●` red: dirty worktree — shows `N files +X/-Y` (lines added/deleted)
 - `●` purple: no upstream or upstream gone
 
-Worktree branches are annotated with `[root]` (repo root) or `[<path>]` (additional worktrees). Multi-checkout branches expand to one row per worktree. Detached worktrees appear as `(detached)` rows with their path annotation. Branches ahead of upstream show up to 5 unpushed commit messages, with overflow count. When a branch is dirty and is a worktree, `enter` opens a full-screen diff overlay. `t`/`c` open a terminal or VSCode at the worktree path. `d` removes the worktree (or deletes the branch for non-worktree branches), with a force-retry prompt on failure.
+Worktree branches are annotated with `[root]` (repo root) or `[<path>]` (additional worktrees). Multi-checkout branches expand to one row per worktree. Detached worktrees appear as `(detached)` rows with their path annotation. Branches ahead of upstream show up to 5 unpushed commit messages, with overflow count. When a branch is dirty and is a worktree, `enter` opens a full-screen diff overlay. `t`/`c` open a terminal or VSCode at the worktree path. `d` removes the worktree (or deletes the branch for non-worktree branches), with a force-retry prompt on failure. Deletion requires destructive mode to be enabled first (`D`).
 
 ### Stashes view (mode 2)
 
-Browse stashes for the selected repo. Use `↑`/`↓` to select a stash, `enter` to view its diff in a full-screen overlay, `d` to drop the selected stash (with confirmation).
+Browse stashes for the selected repo. Use `↑`/`↓` to select a stash, `enter` to view its diff in a full-screen overlay, `d` to drop the selected stash (with confirmation, requires destructive mode).
 
 ## Configuration
 

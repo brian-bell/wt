@@ -91,6 +91,7 @@ type Model struct {
 	confirmForce   bool
 	branchScroll   int
 	activePane     int // 0=left (repos), 1=right (content)
+	destructive    bool
 }
 
 // New creates a Model from discovered repos.
@@ -113,6 +114,7 @@ func (m Model) ConfirmPrompt() string      { return m.confirmPrompt }
 func (m Model) ConfirmForce() bool         { return m.confirmForce }
 func (m Model) BranchScroll() int          { return m.branchScroll }
 func (m Model) ActivePane() int            { return m.activePane }
+func (m Model) Destructive() bool          { return m.destructive }
 
 func (m Model) Init() tea.Cmd {
 	return m.fetchBranches()
@@ -136,6 +138,7 @@ func (m Model) View() string {
 		ConfirmForce:   m.confirmForce,
 		BranchScroll:   m.branchScroll,
 		ActivePane:     m.activePane,
+		Destructive:    m.destructive,
 	})
 }
 
@@ -174,11 +177,20 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.overlay == OverlayConfirm {
 		return m.handleConfirmKey(key)
 	}
+	if m.overlay != OverlayNone {
+		if m.activePane == 0 {
+			return m.handleLeftPaneKey(key)
+		}
+		return m.handleOverlayKey(key)
+	}
+
+	if key == "D" {
+		m.destructive = !m.destructive
+		return m, nil
+	}
+
 	if m.activePane == 0 {
 		return m.handleLeftPaneKey(key)
-	}
-	if m.overlay != OverlayNone {
-		return m.handleOverlayKey(key)
 	}
 	return m.handleRightPaneKey(key)
 }
@@ -349,6 +361,9 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleDelete() (tea.Model, tea.Cmd) {
+	if !m.destructive {
+		return m, nil
+	}
 	if m.mode == ModeStashes && len(m.stashes) > 0 && len(m.repos) > 0 {
 		return m.confirmStashDrop()
 	}

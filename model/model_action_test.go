@@ -204,6 +204,131 @@ func TestModel_ModeKeysIgnoredInOverlay(t *testing.T) {
 	}
 }
 
+// --- Destructive mode ---
+
+func TestModel_DKeyNoOpInReadOnlyMode(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, model.BranchResultMsg{
+		RepoPath: "/dev/alpha",
+		Branches: []gitquery.Branch{
+			{Name: "feat", IsWorktree: true, Dirty: true, WorktreePaths: []string{"/dev/alpha/feat"}},
+		},
+	})
+	m = inRightPane(m)
+	// d should be no-op in read-only mode (default)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if m.Overlay() != model.OverlayNone {
+		t.Errorf("expected OverlayNone in read-only mode, got %d", m.Overlay())
+	}
+}
+
+func TestModel_ShiftDTogglesDestructiveOn(t *testing.T) {
+	m := model.New(testRepos())
+	m = inRightPane(m)
+	if m.Destructive() {
+		t.Fatal("expected destructive=false initially")
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	if !m.Destructive() {
+		t.Error("expected destructive=true after Shift+D")
+	}
+}
+
+func TestModel_DKeyWorksInDestructiveMode(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, model.BranchResultMsg{
+		RepoPath: "/dev/alpha",
+		Branches: []gitquery.Branch{
+			{Name: "feat", IsWorktree: true, Dirty: true, WorktreePaths: []string{"/dev/alpha/feat"}},
+		},
+	})
+	m = inRightPane(m)
+	// Enable destructive mode
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	// Now d should work
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if m.Overlay() != model.OverlayConfirm {
+		t.Errorf("expected OverlayConfirm in destructive mode, got %d", m.Overlay())
+	}
+}
+
+func TestModel_DKeyNoOpInReadOnlyModeStashes(t *testing.T) {
+	m := model.New(testRepos())
+	m = inRightPane(m)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if m.Overlay() != model.OverlayNone {
+		t.Errorf("expected OverlayNone for stash drop in read-only mode, got %d", m.Overlay())
+	}
+}
+
+func TestModel_ShiftDTogglesDestructiveOff(t *testing.T) {
+	m := model.New(testRepos())
+	m = inRightPane(m)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	if m.Destructive() {
+		t.Error("expected destructive=false after second Shift+D")
+	}
+}
+
+func TestModel_ShiftDWorksFromLeftPane(t *testing.T) {
+	m := model.New(testRepos())
+	// Left pane is active by default
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	if !m.Destructive() {
+		t.Error("expected destructive=true from left pane")
+	}
+}
+
+func TestModel_DestructivePersistsAcrossRepoSwitch(t *testing.T) {
+	m := model.New(testRepos())
+	m = inRightPane(m)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	// Switch to left pane and navigate to a different repo
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	if !m.Destructive() {
+		t.Error("expected destructive to persist after repo switch")
+	}
+}
+
+func TestModel_ShiftDNoOpDuringConfirmOverlay(t *testing.T) {
+	m := modelWithWorktreeBranch()
+	// Open confirm dialog
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if m.Overlay() != model.OverlayConfirm {
+		t.Fatal("expected OverlayConfirm")
+	}
+	// Shift+D should be ignored while confirm is active
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	if !m.Destructive() {
+		t.Error("expected destructive to remain true during confirm overlay")
+	}
+}
+
+func TestModel_ShiftDNoOpDuringDiffOverlay(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, model.BranchResultMsg{
+		RepoPath: "/dev/alpha",
+		Branches: []gitquery.Branch{
+			{Name: "feat", IsWorktree: true, Dirty: true, WorktreePaths: []string{"/dev/alpha/feat"}},
+		},
+	})
+	m = inRightPane(m)
+	// Open diff overlay
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.Overlay() == model.OverlayNone {
+		t.Fatal("expected a diff overlay")
+	}
+	// Not in destructive mode; Shift+D should be ignored
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	if m.Destructive() {
+		t.Error("expected destructive to remain false during diff overlay")
+	}
+}
+
 // --- Confirmation dialog + delete ---
 
 func worktreeBranch() gitquery.Branch {
@@ -215,6 +340,12 @@ func worktreeBranch() gitquery.Branch {
 	}
 }
 
+// enableDestructive presses Shift+D to enter destructive mode.
+func enableDestructive(m model.Model) model.Model {
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	return m
+}
+
 func modelWithWorktreeBranch() model.Model {
 	m := model.New(testRepos())
 	m, _ = update(m, model.BranchResultMsg{
@@ -222,6 +353,7 @@ func modelWithWorktreeBranch() model.Model {
 		Branches: []gitquery.Branch{worktreeBranch()},
 	})
 	m = inRightPane(m)
+	m = enableDestructive(m)
 	return m
 }
 
@@ -243,6 +375,7 @@ func TestModel_DKeyOnNonWorktreeBranchOpensDeleteConfirm(t *testing.T) {
 		Branches: []gitquery.Branch{{Name: "main"}},
 	})
 	m = inRightPane(m)
+	m = enableDestructive(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	if m.Overlay() != model.OverlayConfirm {
 		t.Errorf("expected OverlayConfirm for non-worktree branch, got %d", m.Overlay())
@@ -350,6 +483,7 @@ func TestModel_BranchDeleteFailReturnsDeleteFailedMsg(t *testing.T) {
 		Branches: []gitquery.Branch{{Name: "feat"}},
 	})
 	m = inRightPane(m)
+	m = enableDestructive(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
 	if cmd == nil {
@@ -461,6 +595,7 @@ func TestModel_ConfirmDialogBlocksModeSwitch(t *testing.T) {
 func modelInMode2WithStashes() model.Model {
 	m := model.New(testRepos())
 	m = inRightPane(m)
+	m = enableDestructive(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	return m
@@ -597,6 +732,7 @@ func TestModel_DKeyOnExpansionRowTargetsSpecificPath(t *testing.T) {
 	}
 	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
 	m = inRightPane(m)
+	m = enableDestructive(m)
 	// Navigate to expansion row (index 1 = /dev/feat-B)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
 	if m.BranchSelected() != 1 {

@@ -58,6 +58,7 @@ type RenderParams struct {
 	ConfirmForce   bool
 	BranchScroll   int
 	ActivePane     int
+	Destructive    bool
 }
 
 // Render produces the full terminal view string.
@@ -74,18 +75,22 @@ func Render(p RenderParams) string {
 		return renderOverlay(p)
 	}
 
-	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay, p.ActivePane)
+	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay, p.ActivePane, p.Destructive)
 
 	// Border colors based on active pane
 	activeBorderColor := lipgloss.Color("12")
 	inactiveBorderColor := lipgloss.Color("238")
+	destructiveBorderColor := lipgloss.Color("9")
 
 	leftBorderColor := inactiveBorderColor
 	rightBorderColor := inactiveBorderColor
+	if p.Destructive {
+		rightBorderColor = destructiveBorderColor
+	} else if p.ActivePane == 1 {
+		rightBorderColor = activeBorderColor
+	}
 	if p.ActivePane == 0 {
 		leftBorderColor = activeBorderColor
-	} else {
-		rightBorderColor = activeBorderColor
 	}
 
 	leftContentWidth := LeftPaneWidth - 2 // left + right border
@@ -168,18 +173,29 @@ func renderModeHeader(mode, width int) string {
 }
 
 // RenderStatusBar produces the bottom status bar (hints only, no mode tabs).
-func RenderStatusBar(width, mode, overlay, activePane int) string {
+func RenderStatusBar(width, mode, overlay, activePane int, destructive bool) string {
 	var hints string
 	if overlay == 3 {
 		hints = "  y: confirm  n/esc: cancel"
 	} else if overlay != 0 {
 		hints = "  ↑/↓ scroll  esc: close"
 	} else if mode == 2 {
-		hints = "  tab: pane  q/esc: quit  ↑/↓ select  enter: diff  d: drop"
+		hints = "  tab: pane  q/esc: quit  ↑/↓ select  enter: diff"
+		if destructive {
+			hints += "  " + dirtyRedStyle.Render("d: drop")
+		} else {
+			hints += "  D: destructive mode"
+		}
 	} else {
 		keys := "  |  tab: pane  q/esc: quit"
 		if activePane == 1 {
-			keys += "  t: terminal  c: code  d: delete"
+			keys += "  t: terminal  c: code"
+			if destructive {
+				keys += "  " + dirtyRedStyle.Render("d: delete")
+			}
+		}
+		if !destructive {
+			keys += "  D: destructive mode"
 		}
 		hints = " " + cleanStyle.Render("✔") + " clean  " + aheadBehindStyle.Render("●") + " ahead/behind  " + dirtyRedStyle.Render("●") + " dirty  " + noUpstreamStyle.Render("●") + " no upstream" + keys
 	}
@@ -315,7 +331,7 @@ func renderStashPane(stashes []gitquery.Stash, selected, width, height int) []st
 }
 
 func renderOverlay(p RenderParams) string {
-	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay, p.ActivePane)
+	statusBar := RenderStatusBar(p.Width, p.Mode, p.Overlay, p.ActivePane, p.Destructive)
 	contentHeight := p.Height - 1
 
 	// Confirmation dialog overlay

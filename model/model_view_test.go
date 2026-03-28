@@ -151,10 +151,69 @@ func TestModel_StatusBarMode2ShowsDropHint(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // mode 2
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}}) // enable destructive
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})                     // mode 2
 
 	view := m.View()
 	if !strings.Contains(view, "d: drop") {
-		t.Error("mode 2 status bar should mention 'd: drop'")
+		t.Error("mode 2 status bar should mention 'd: drop' in destructive mode")
+	}
+}
+
+// --- Destructive mode view tests ---
+
+func TestModel_ViewReadOnlyHidesDeleteHint(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
+	m = inRightPane(m)
+
+	view := m.View()
+	if strings.Contains(view, "d: delete") {
+		t.Error("read-only mode should NOT show 'd: delete'")
+	}
+}
+
+func TestModel_ViewReadOnlyHidesDropHint(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
+	m = inRightPane(m)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // mode 2
+
+	view := m.View()
+	if strings.Contains(view, "d: drop") {
+		t.Error("read-only mode should NOT show 'd: drop'")
+	}
+}
+
+func TestModel_ViewReadOnlyShowsDestructiveModeHint(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
+
+	view := m.View()
+	if !strings.Contains(view, "D: destructive mode") {
+		t.Error("read-only mode should show 'D: destructive mode' hint")
+	}
+}
+
+func TestModel_ViewDestructiveModeShowsDeleteHint(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
+	m = inRightPane(m)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+
+	view := m.View()
+	if !strings.Contains(view, "d: delete") {
+		t.Error("destructive mode should show 'd: delete'")
+	}
+}
+
+func TestModel_ViewDestructiveModeHidesDestructiveHint(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+
+	view := m.View()
+	if strings.Contains(view, "D: destructive mode") {
+		t.Error("destructive mode should NOT show 'D: destructive mode' hint")
 	}
 }
