@@ -90,6 +90,7 @@ type Model struct {
 	confirmAction  func() tea.Cmd
 	confirmForce   bool
 	branchScroll   int
+	repoScroll     int
 	activePane     int // 0=left (repos), 1=right (content)
 	destructive    bool
 }
@@ -113,6 +114,7 @@ func (m Model) OverlayScroll() int         { return m.overlayScroll }
 func (m Model) ConfirmPrompt() string      { return m.confirmPrompt }
 func (m Model) ConfirmForce() bool         { return m.confirmForce }
 func (m Model) BranchScroll() int          { return m.branchScroll }
+func (m Model) RepoScroll() int            { return m.repoScroll }
 func (m Model) ActivePane() int            { return m.activePane }
 func (m Model) Destructive() bool          { return m.destructive }
 
@@ -137,6 +139,7 @@ func (m Model) View() string {
 		ConfirmPrompt:  m.confirmPrompt,
 		ConfirmForce:   m.confirmForce,
 		BranchScroll:   m.branchScroll,
+		RepoScroll:     m.repoScroll,
 		ActivePane:     m.activePane,
 		Destructive:    m.destructive,
 	})
@@ -151,6 +154,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m = m.ensureRepoVisible()
 	case BranchResultMsg:
 		return m.handleBranchResult(msg), nil
 	case StashResultMsg:
@@ -220,6 +224,7 @@ func (m Model) handleLeftPaneKey(key string) (tea.Model, tea.Cmd) {
 			} else {
 				m.selected = len(m.repos) - 1
 			}
+			m = m.ensureRepoVisible()
 			m = m.resetRightPaneCursors()
 			return m, m.fetchForMode()
 		}
@@ -230,6 +235,7 @@ func (m Model) handleLeftPaneKey(key string) (tea.Model, tea.Cmd) {
 			} else {
 				m.selected = 0
 			}
+			m = m.ensureRepoVisible()
 			m = m.resetRightPaneCursors()
 			return m, m.fetchForMode()
 		}
@@ -634,6 +640,20 @@ func (m Model) selectedRow() (gitquery.BranchRow, bool) {
 func (m Model) isSelectedBranchDirtyWorktree() bool {
 	row, ok := m.selectedRow()
 	return ok && row.Branch.Dirty && row.Branch.IsWorktree
+}
+
+func (m Model) ensureRepoVisible() Model {
+	contentHeight := m.height - ui.RepoContentOverhead
+	if contentHeight <= 0 {
+		contentHeight = 1
+	}
+	if m.repoScroll > m.selected {
+		m.repoScroll = m.selected
+	}
+	if m.selected >= m.repoScroll+contentHeight {
+		m.repoScroll = m.selected - contentHeight + 1
+	}
+	return m
 }
 
 func (m Model) ensureBranchVisible() Model {

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/brian-bell/wtui/gitquery"
 	"github.com/brian-bell/wtui/scanner"
 )
@@ -164,14 +166,27 @@ func TestRepoList_ScrollsWhenSelectionExceedsHeight(t *testing.T) {
 		{Path: "/d", DisplayName: "delta"},
 		{Path: "/e", DisplayName: "echo"},
 	}
-	// Height of 3 means only 3 visible at a time
-	lines := renderRepoList(repos, 4, LeftPaneWidth-2, 3) // selected=4 (echo), height=3
+	// Height of 3 means only 3 visible at a time; scroll=2 shows repos 2-4
+	lines := renderRepoList(repos, 4, 2, LeftPaneWidth-2, 3)
 	joined := strings.Join(lines, "\n")
 	if !strings.Contains(joined, "echo") {
 		t.Error("selected item 'echo' should be visible")
 	}
 	if strings.Contains(joined, "alpha") {
 		t.Error("'alpha' should be scrolled off the top")
+	}
+}
+
+func TestRepoList_TruncatesLongNames(t *testing.T) {
+	width := LeftPaneWidth - 2
+	repos := []scanner.Repo{
+		{Path: "/a", DisplayName: "this-is-a-very-long-repository-name-that-exceeds-width"},
+	}
+	lines := renderRepoList(repos, 0, 0, width, 3)
+	for i, line := range lines {
+		if lipgloss.Width(line) > width {
+			t.Errorf("line %d width %d exceeds pane width %d", i, lipgloss.Width(line), width)
+		}
 	}
 }
 

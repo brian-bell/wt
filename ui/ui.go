@@ -12,6 +12,10 @@ import (
 
 const LeftPaneWidth = 30
 
+// RepoContentOverhead is the number of rows consumed by chrome around the
+// repo list: status bar (1) + top/bottom borders (2).
+const RepoContentOverhead = 3
+
 // BranchContentOverhead is the number of rows consumed by chrome around the
 // branch list: status bar (1) + top/bottom borders (2) + mode header with
 // separator (2). Both the model (ensureBranchVisible) and the renderer use
@@ -57,6 +61,7 @@ type RenderParams struct {
 	ConfirmPrompt  string
 	ConfirmForce   bool
 	BranchScroll   int
+	RepoScroll     int
 	ActivePane     int
 	Destructive    bool
 }
@@ -96,7 +101,7 @@ func Render(p RenderParams) string {
 	leftContentWidth := LeftPaneWidth - 2 // left + right border
 	innerHeight := p.Height - 3           // status bar + top/bottom borders
 
-	leftLines := renderRepoList(p.Repos, p.Selected, leftContentWidth, innerHeight)
+	leftLines := renderRepoList(p.Repos, p.Selected, p.RepoScroll, leftContentWidth, innerHeight)
 	leftContent := strings.Join(leftLines, "\n")
 	leftPane := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
@@ -203,23 +208,18 @@ func RenderStatusBar(width, mode, overlay, activePane int, destructive bool) str
 	return statusStyle.Width(width).Render(hints)
 }
 
-func renderRepoList(repos []scanner.Repo, selected, width, height int) []string {
+func renderRepoList(repos []scanner.Repo, selected, scroll, width, height int) []string {
 	lines := make([]string, height)
 
-	start := 0
-	if selected >= height {
-		start = selected - height + 1
-	}
-
 	for i := 0; i < height; i++ {
-		idx := start + i
+		idx := scroll + i
 		if idx < len(repos) {
 			name := repos[idx].DisplayName
 			if idx == selected {
-				line := fmt.Sprintf(" > %s", name)
+				line := truncateToWidth(fmt.Sprintf(" > %s", name), width)
 				lines[i] = selectedStyle.Width(width).Render(line)
 			} else {
-				line := fmt.Sprintf("   %s", name)
+				line := truncateToWidth(fmt.Sprintf("   %s", name), width)
 				lines[i] = repoStyle.Width(width).Render(line)
 			}
 		} else {
