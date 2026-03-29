@@ -22,17 +22,17 @@ const (
 	ModeReflog
 )
 
-// OverlayState represents what overlay (if any) is displayed.
-type OverlayState int
+// OverlayState is an alias so tests can reference model.OverlayNone etc.
+type OverlayState = ui.OverlayState
 
 const (
-	OverlayNone OverlayState = iota
-	OverlayStashDiff
-	OverlayBranchDiff
-	OverlayConfirm
-	OverlayCommitDiff
-	OverlayWorktreeDiff
-	OverlayReflogDiff
+	OverlayNone         = ui.OverlayNone
+	OverlayStashDiff    = ui.OverlayStashDiff
+	OverlayBranchDiff   = ui.OverlayBranchDiff
+	OverlayConfirm      = ui.OverlayConfirm
+	OverlayCommitDiff   = ui.OverlayCommitDiff
+	OverlayWorktreeDiff = ui.OverlayWorktreeDiff
+	OverlayReflogDiff   = ui.OverlayReflogDiff
 )
 
 // --- Messages ---
@@ -203,7 +203,7 @@ func (m Model) View() string {
 		Stashes:          m.stashes,
 		BranchSelected:   m.branchSelected,
 		StashSelected:    m.stashSelected,
-		Overlay:          int(m.overlay),
+		Overlay:          m.overlay,
 		OverlayDiff:      m.overlayDiff,
 		OverlayScroll:    m.overlayScroll,
 		ConfirmPrompt:    m.confirmPrompt,

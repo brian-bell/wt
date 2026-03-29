@@ -598,7 +598,7 @@ func TestRender_ConfirmDialogShowsPrompt(t *testing.T) {
 		Width:         80,
 		Height:        24,
 		Mode:          1,
-		Overlay:       3,
+		Overlay:       OverlayConfirm,
 		ConfirmPrompt: "Remove worktree /dev/alpha/feat? (y/n)",
 	})
 	if !strings.Contains(view, "Remove worktree /dev/alpha/feat") {
@@ -615,7 +615,7 @@ func TestRender_ForceConfirmDialogShowsPrompt(t *testing.T) {
 		Width:         80,
 		Height:        24,
 		Mode:          1,
-		Overlay:       3,
+		Overlay:       OverlayConfirm,
 		ConfirmPrompt: "Force delete /dev/alpha/feat? (y/n)",
 		ConfirmForce:  true,
 	})
@@ -1079,7 +1079,7 @@ func TestReflogDiffOverlay_EmptyDiffShowsMessage(t *testing.T) {
 		Width:   80,
 		Height:  24,
 		Mode:    5,
-		Overlay: 6, // OverlayReflogDiff
+		Overlay: OverlayReflogDiff,
 		// OverlayDiff is empty
 	})
 	if !strings.Contains(view, "No changes at this reflog entry") {
@@ -1092,7 +1092,7 @@ func TestReflogDiffOverlay_NonEmptyDiffShowsContent(t *testing.T) {
 		Width:       80,
 		Height:      24,
 		Mode:        5,
-		Overlay:     6, // OverlayReflogDiff
+		Overlay:     OverlayReflogDiff,
 		OverlayDiff: "diff --git a/f.txt\n+added line",
 	})
 	if !strings.Contains(view, "diff --git") {
