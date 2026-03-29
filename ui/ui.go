@@ -45,6 +45,7 @@ var (
 	stashMsgStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
 	stashSelStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true).Reverse(true)
 	branchSelStyle    = lipgloss.NewStyle().Bold(true).Reverse(true)
+	rootStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
 	noUpstreamStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("5"))
 	aheadBehindStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
 	dirtyRedStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
@@ -55,29 +56,32 @@ var (
 
 // RenderParams holds everything the renderer needs.
 type RenderParams struct {
-	Repos          []scanner.Repo
-	Selected       int
-	Width          int
-	Height         int
-	Mode           int
-	Branches       []gitquery.BranchRow
-	Stashes        []gitquery.Stash
-	BranchSelected int
-	StashSelected  int
-	Overlay        int
-	OverlayDiff    string
-	OverlayScroll  int
-	ConfirmPrompt  string
-	ConfirmForce   bool
-	BranchScroll   int
-	RepoScroll     int
-	StashScroll    int
-	ActivePane     int
-	Destructive    bool
-	StaleSelected  bool
-	Commits        []gitquery.Commit
-	CommitSelected int
-	CommitScroll   int
+	Repos            []scanner.Repo
+	Selected         int
+	Width            int
+	Height           int
+	Mode             int
+	Branches         []gitquery.BranchRow
+	Stashes          []gitquery.Stash
+	BranchSelected   int
+	StashSelected    int
+	Overlay          int
+	OverlayDiff      string
+	OverlayScroll    int
+	ConfirmPrompt    string
+	ConfirmForce     bool
+	BranchScroll     int
+	RepoScroll       int
+	StashScroll      int
+	ActivePane       int
+	Destructive      bool
+	StaleSelected    bool
+	Worktrees        []gitquery.Worktree
+	WorktreeSelected int
+	WorktreeScroll   int
+	Commits          []gitquery.Commit
+	CommitSelected   int
+	CommitScroll     int
 }
 
 // Render produces the full terminal view string.
@@ -141,14 +145,18 @@ func Render(p RenderParams) string {
 	branchSel := p.BranchSelected
 	stashSel := p.StashSelected
 	commitSel := p.CommitSelected
+	worktreeSel := p.WorktreeSelected
 	if p.ActivePane == 0 {
 		branchSel = -1
 		stashSel = -1
 		commitSel = -1
+		worktreeSel = -1
 	}
 
 	var rightLines []string
 	switch {
+	case p.Mode == 1 && len(p.Worktrees) > 0:
+		rightLines = renderWorktreePane(p.Worktrees, worktreeSel, p.WorktreeScroll, rightContentWidth, rightContentHeight)
 	case p.Mode == 2 && len(p.Branches) > 0:
 		rightLines = renderBranchPaneSelected(p.Branches, branchSel, p.BranchScroll, rightContentWidth, rightContentHeight, repoPath)
 	case p.Mode == 3 && len(p.Stashes) > 0:
@@ -229,7 +237,7 @@ func RenderStatusBar(width, mode, overlay, activePane int, destructive, staleSel
 		}
 		hints = " " + cleanStyle.Render("✔") + " clean  " + aheadBehindStyle.Render("●") + " ahead/behind  " + dirtyRedStyle.Render("●") + " dirty  " + noUpstreamStyle.Render("●") + " no upstream" + keys
 	} else {
-		hints = "  tab: pane  q/esc: quit"
+		hints = "  tab: pane  q/esc: quit  ↑/↓ select"
 	}
 
 	return statusStyle.Width(width).Render(hints)
@@ -424,6 +432,56 @@ func renderCommitPane(commits []gitquery.Commit, selected, scroll, width, height
 		}
 
 		content = append(content, truncateToWidth(line, width))
+	}
+
+	// Apply scroll offset
+	if scroll > len(content) {
+		scroll = len(content)
+	}
+	visible := content[scroll:]
+
+	lines := make([]string, height)
+	copy(lines, visible)
+	return lines
+}
+
+func renderWorktreePane(worktrees []gitquery.Worktree, selected, scroll, width, height int) []string {
+	var content []string
+	for i, wt := range worktrees {
+		name := branchStyle.Render(wt.BranchName)
+		if wt.Detached {
+			name = branchStyle.Render("(detached)")
+		}
+
+		var indicators string
+		if wt.Stale {
+			indicators = dirtyRedStyle.Render(" ✗") + " " + dirtyRedStyle.Render("stale")
+		} else if wt.Dirty {
+			indicators = dirtyRedStyle.Render(" ●")
+			indicators += fmt.Sprintf(" %d files ", wt.FilesChanged)
+			indicators += diffAddStyle.Render(fmt.Sprintf("+%d", wt.LinesAdded))
+			indicators += "/" + diffDelStyle.Render(fmt.Sprintf("-%d", wt.LinesDeleted))
+		} else {
+			indicators = cleanStyle.Render(" ✔")
+		}
+
+		var rootLabel string
+		if wt.IsMain {
+			rootLabel = " " + rootStyle.Render("[root]")
+		}
+
+		path := " " + commitStyle.Render(wt.Path)
+
+		line := "   " + name + indicators + rootLabel + path
+		if i == selected {
+			line = branchSelStyle.Render(" > " + strings.TrimPrefix(line, "   "))
+		}
+		content = append(content, line)
+	}
+
+	// Truncate lines to pane width
+	for i, line := range content {
+		content[i] = truncateToWidth(line, width)
 	}
 
 	// Apply scroll offset

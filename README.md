@@ -46,32 +46,48 @@ The UI has two panes: repos on the left, content on the right. `tab` switches fo
 |-----|--------|
 | `↑`/`k` | Move selection up |
 | `↓`/`j` | Move selection down |
-| `1`/`2` | Switch to branches / stashes mode |
-| `←`/`h`/`→`/`l` | Switch mode |
-| `enter` | View diff (dirty branch or stash) |
+| `1`/`2`/`3`/`4` | Switch to worktrees / branches / stashes / history |
+| `←`/`h`/`→`/`l` | Cycle through modes |
+| `enter` | View diff (dirty branch, stash, or commit) |
 | `d` | Delete branch/worktree or drop stash — requires destructive mode |
+| `p` | Prune stale worktree — requires destructive mode (branches view) |
 | `t` | Open terminal at worktree path |
 | `c` | Open VSCode at worktree path |
+| `y` | Copy commit hash to clipboard (history view) |
 | `D` | Toggle destructive mode |
 | `tab` | Switch focus to left pane |
 | `q`/`esc` | Close overlay or quit |
 
-The right pane header shows the active mode (`[1] branches` or `[2] stashes`). Press `1` or `2` to switch.
+The right pane header shows the active mode. Press `1`–`4` or use arrow keys to switch between worktrees, branches, stashes, and history.
 
-### Branches view (mode 1)
+### Worktrees view (mode 1)
 
-The right pane shows all local branches alphabetically with stacking indicators:
+The default view. Shows all worktree checkouts for the selected repo. The main (root) worktree always appears first with a blue `[root]` annotation.
+
+Each row shows the branch name (or `(detached)` for detached HEAD), status indicators, and the worktree path:
+
+- `✔` green: clean working tree
+- `●` red: dirty — shows `N files +X/-Y` (lines added/deleted)
+- `✗` red: stale — worktree directory no longer exists
+
+### Branches view (mode 2)
+
+Shows all local branches alphabetically with stacking indicators:
 
 - `✔` green: even with upstream, clean working tree
 - `●` yellow: ahead/behind upstream — shows `+N/-N` counts
 - `●` red: dirty worktree — shows `N files +X/-Y` (lines added/deleted)
 - `●` purple: no upstream or upstream gone
 
-Worktree branches are annotated with `[root]` (repo root) or `[<path>]` (additional worktrees). Multi-checkout branches expand to one row per worktree. Detached worktrees appear as `(detached)` rows with their path annotation. Branches ahead of upstream show up to 5 unpushed commit messages, with overflow count. When a branch is dirty and is a worktree, `enter` opens a full-screen diff overlay. `t`/`c` open a terminal or VSCode at the worktree path. `d` removes the worktree (or deletes the branch for non-worktree branches), with a force-retry prompt on failure. Deletion requires destructive mode to be enabled first (`D`).
+Worktree branches are annotated with `[root]` (repo root) or `[<path>]` (additional worktrees). Multi-checkout branches expand to one row per worktree. Detached worktrees appear as `(detached)` rows with their path annotation. Branches ahead of upstream show up to 5 unpushed commit messages, with overflow count. When a branch is dirty and is a worktree, `enter` opens a full-screen diff overlay. `t`/`c` open a terminal or VSCode at the worktree path. `d` removes the worktree (or deletes the branch for non-worktree branches), with a force-retry prompt on failure. `p` prunes stale worktree references. Deletion requires destructive mode to be enabled first (`D`).
 
-### Stashes view (mode 2)
+### Stashes view (mode 3)
 
 Browse stashes for the selected repo. Long stash messages wrap to two lines (date + message start, then indented continuation). Use `↑`/`↓` to select a stash, `enter` to view its diff in a full-screen overlay, `d` to drop the selected stash (with confirmation, requires destructive mode). The stash list scrolls when entries exceed the pane height.
+
+### History view (mode 4)
+
+Browse recent commits (up to 50) for the selected repo. Each row shows the commit hash, author, relative date, and subject. Use `enter` to view the full commit diff, `y` to copy the commit hash to clipboard, and `t`/`c` to open terminal or VSCode at the repo root.
 
 ## Configuration
 

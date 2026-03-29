@@ -72,6 +72,11 @@ type WorktreePrunedMsg struct {
 	RepoPath string
 }
 
+type WorktreeResultMsg struct {
+	RepoPath  string
+	Worktrees []gitquery.Worktree
+}
+
 type CommitResultMsg struct {
 	RepoPath string
 	Commits  []gitquery.Commit
@@ -95,29 +100,32 @@ type DeleteFailedMsg struct {
 
 // Model is the bubbletea application model.
 type Model struct {
-	repos          []scanner.Repo
-	selected       int
-	width          int
-	height         int
-	mode           Mode
-	rows           []gitquery.BranchRow
-	stashes        []gitquery.Stash
-	branchSelected int
-	stashSelected  int
-	commits        []gitquery.Commit
-	commitSelected int
-	commitScroll   int
-	overlay        OverlayState
-	overlayDiff    string
-	overlayScroll  int
-	confirmPrompt  string
-	confirmAction  func() tea.Cmd
-	confirmForce   bool
-	branchScroll   int
-	repoScroll     int
-	stashScroll    int
-	activePane     int // 0=left (repos), 1=right (content)
-	destructive    bool
+	repos            []scanner.Repo
+	selected         int
+	width            int
+	height           int
+	mode             Mode
+	rows             []gitquery.BranchRow
+	stashes          []gitquery.Stash
+	branchSelected   int
+	stashSelected    int
+	worktrees        []gitquery.Worktree
+	worktreeSelected int
+	worktreeScroll   int
+	commits          []gitquery.Commit
+	commitSelected   int
+	commitScroll     int
+	overlay          OverlayState
+	overlayDiff      string
+	overlayScroll    int
+	confirmPrompt    string
+	confirmAction    func() tea.Cmd
+	confirmForce     bool
+	branchScroll     int
+	repoScroll       int
+	stashScroll      int
+	activePane       int // 0=left (repos), 1=right (content)
+	destructive      bool
 }
 
 // New creates a Model from discovered repos.
@@ -125,27 +133,30 @@ func New(repos []scanner.Repo) Model {
 	return Model{repos: repos, mode: ModeWorktrees}
 }
 
-func (m Model) Selected() int              { return m.selected }
-func (m Model) Width() int                 { return m.width }
-func (m Model) Height() int                { return m.height }
-func (m Model) Mode() Mode                 { return m.mode }
-func (m Model) Rows() []gitquery.BranchRow { return m.rows }
-func (m Model) Stashes() []gitquery.Stash  { return m.stashes }
-func (m Model) BranchSelected() int        { return m.branchSelected }
-func (m Model) StashSelected() int         { return m.stashSelected }
-func (m Model) Commits() []gitquery.Commit { return m.commits }
-func (m Model) CommitSelected() int        { return m.commitSelected }
-func (m Model) CommitScroll() int          { return m.commitScroll }
-func (m Model) Overlay() OverlayState      { return m.overlay }
-func (m Model) OverlayDiff() string        { return m.overlayDiff }
-func (m Model) OverlayScroll() int         { return m.overlayScroll }
-func (m Model) ConfirmPrompt() string      { return m.confirmPrompt }
-func (m Model) ConfirmForce() bool         { return m.confirmForce }
-func (m Model) BranchScroll() int          { return m.branchScroll }
-func (m Model) RepoScroll() int            { return m.repoScroll }
-func (m Model) StashScroll() int           { return m.stashScroll }
-func (m Model) ActivePane() int            { return m.activePane }
-func (m Model) Destructive() bool          { return m.destructive }
+func (m Model) Selected() int                  { return m.selected }
+func (m Model) Width() int                     { return m.width }
+func (m Model) Height() int                    { return m.height }
+func (m Model) Mode() Mode                     { return m.mode }
+func (m Model) Rows() []gitquery.BranchRow     { return m.rows }
+func (m Model) Stashes() []gitquery.Stash      { return m.stashes }
+func (m Model) BranchSelected() int            { return m.branchSelected }
+func (m Model) StashSelected() int             { return m.stashSelected }
+func (m Model) Worktrees() []gitquery.Worktree { return m.worktrees }
+func (m Model) WorktreeSelected() int          { return m.worktreeSelected }
+func (m Model) WorktreeScroll() int            { return m.worktreeScroll }
+func (m Model) Commits() []gitquery.Commit     { return m.commits }
+func (m Model) CommitSelected() int            { return m.commitSelected }
+func (m Model) CommitScroll() int              { return m.commitScroll }
+func (m Model) Overlay() OverlayState          { return m.overlay }
+func (m Model) OverlayDiff() string            { return m.overlayDiff }
+func (m Model) OverlayScroll() int             { return m.overlayScroll }
+func (m Model) ConfirmPrompt() string          { return m.confirmPrompt }
+func (m Model) ConfirmForce() bool             { return m.confirmForce }
+func (m Model) BranchScroll() int              { return m.branchScroll }
+func (m Model) RepoScroll() int                { return m.repoScroll }
+func (m Model) StashScroll() int               { return m.stashScroll }
+func (m Model) ActivePane() int                { return m.activePane }
+func (m Model) Destructive() bool              { return m.destructive }
 
 func (m Model) Init() tea.Cmd {
 	return m.fetchForMode()
@@ -153,29 +164,32 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) View() string {
 	return ui.Render(ui.RenderParams{
-		Repos:          m.repos,
-		Selected:       m.selected,
-		Width:          m.width,
-		Height:         m.height,
-		Mode:           int(m.mode),
-		Branches:       m.rows,
-		Stashes:        m.stashes,
-		BranchSelected: m.branchSelected,
-		StashSelected:  m.stashSelected,
-		Overlay:        int(m.overlay),
-		OverlayDiff:    m.overlayDiff,
-		OverlayScroll:  m.overlayScroll,
-		ConfirmPrompt:  m.confirmPrompt,
-		ConfirmForce:   m.confirmForce,
-		BranchScroll:   m.branchScroll,
-		RepoScroll:     m.repoScroll,
-		StashScroll:    m.stashScroll,
-		ActivePane:     m.activePane,
-		Destructive:    m.destructive,
-		StaleSelected:  m.isSelectedStale(),
-		Commits:        m.commits,
-		CommitSelected: m.commitSelected,
-		CommitScroll:   m.commitScroll,
+		Repos:            m.repos,
+		Selected:         m.selected,
+		Width:            m.width,
+		Height:           m.height,
+		Mode:             int(m.mode),
+		Branches:         m.rows,
+		Stashes:          m.stashes,
+		BranchSelected:   m.branchSelected,
+		StashSelected:    m.stashSelected,
+		Overlay:          int(m.overlay),
+		OverlayDiff:      m.overlayDiff,
+		OverlayScroll:    m.overlayScroll,
+		ConfirmPrompt:    m.confirmPrompt,
+		ConfirmForce:     m.confirmForce,
+		BranchScroll:     m.branchScroll,
+		RepoScroll:       m.repoScroll,
+		StashScroll:      m.stashScroll,
+		ActivePane:       m.activePane,
+		Destructive:      m.destructive,
+		StaleSelected:    m.isSelectedStale(),
+		Worktrees:        m.worktrees,
+		WorktreeSelected: m.worktreeSelected,
+		WorktreeScroll:   m.worktreeScroll,
+		Commits:          m.commits,
+		CommitSelected:   m.commitSelected,
+		CommitScroll:     m.commitScroll,
 	})
 }
 
@@ -206,6 +220,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleBranchDeleted(msg)
 	case WorktreePrunedMsg:
 		return m.handleWorktreePruned(msg)
+	case WorktreeResultMsg:
+		return m.handleWorktreeResult(msg), nil
 	case CommitResultMsg:
 		return m.handleCommitResult(msg), nil
 	case CommitDiffResultMsg:
@@ -333,9 +349,11 @@ func (m Model) handleRightPaneKey(key string) (tea.Model, tea.Cmd) {
 			m.mode = ModeWorktrees
 			m.branchSelected = 0
 			m.stashSelected = 0
+			m.worktreeSelected = 0
+			m.worktreeScroll = 0
 			m.commitSelected = 0
 			m.commitScroll = 0
-			return m, nil
+			return m, m.fetchWorktrees()
 		}
 	case "2":
 		if m.mode != ModeBranches {
@@ -385,6 +403,15 @@ func (m Model) handleRightPaneKey(key string) (tea.Model, tea.Cmd) {
 // --- Cursor navigation ---
 
 func (m Model) handleCursorUp() (tea.Model, tea.Cmd) {
+	if m.mode == ModeWorktrees && len(m.worktrees) > 0 {
+		if m.worktreeSelected > 0 {
+			m.worktreeSelected--
+		} else {
+			m.worktreeSelected = len(m.worktrees) - 1
+		}
+		m = m.ensureWorktreeVisible()
+		return m, nil
+	}
 	if m.mode == ModeBranches && len(m.rows) > 0 {
 		if m.branchSelected > 0 {
 			m.branchSelected--
@@ -414,6 +441,15 @@ func (m Model) handleCursorUp() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleCursorDown() (tea.Model, tea.Cmd) {
+	if m.mode == ModeWorktrees && len(m.worktrees) > 0 {
+		if m.worktreeSelected < len(m.worktrees)-1 {
+			m.worktreeSelected++
+		} else {
+			m.worktreeSelected = 0
+		}
+		m = m.ensureWorktreeVisible()
+		return m, nil
+	}
 	if m.mode == ModeBranches && len(m.rows) > 0 {
 		if m.branchSelected < len(m.rows)-1 {
 			m.branchSelected++
@@ -609,10 +645,13 @@ func (m Model) resetRightPaneCursors() Model {
 	m.stashSelected = 0
 	m.branchScroll = 0
 	m.stashScroll = 0
+	m.worktreeSelected = 0
+	m.worktreeScroll = 0
 	m.commitSelected = 0
 	m.commitScroll = 0
 	m.rows = nil
 	m.stashes = nil
+	m.worktrees = nil
 	m.commits = nil
 	return m
 }
@@ -621,6 +660,16 @@ func (m Model) resetRightPaneCursors() Model {
 
 func (m Model) isCurrentRepo(repoPath string) bool {
 	return m.selected < len(m.repos) && m.repos[m.selected].Path == repoPath
+}
+
+func (m Model) handleWorktreeResult(msg WorktreeResultMsg) Model {
+	if m.isCurrentRepo(msg.RepoPath) {
+		m.worktrees = msg.Worktrees
+		if len(m.worktrees) == 0 || m.worktreeSelected >= len(m.worktrees) {
+			m.worktreeSelected = 0
+		}
+	}
+	return m
 }
 
 func (m Model) handleBranchResult(msg BranchResultMsg) Model {
@@ -740,7 +789,7 @@ func (m Model) handleCopyHash() (tea.Model, tea.Cmd) {
 func (m Model) fetchForMode() tea.Cmd {
 	switch m.mode {
 	case ModeWorktrees:
-		return nil
+		return m.fetchWorktrees()
 	case ModeBranches:
 		return m.fetchBranches()
 	case ModeStashes:
@@ -749,6 +798,17 @@ func (m Model) fetchForMode() tea.Cmd {
 		return m.fetchCommits()
 	}
 	return nil
+}
+
+func (m Model) fetchWorktrees() tea.Cmd {
+	if len(m.repos) == 0 {
+		return nil
+	}
+	repoPath := m.repos[m.selected].Path
+	return func() tea.Msg {
+		worktrees, _ := gitquery.ListWorktrees(repoPath)
+		return WorktreeResultMsg{RepoPath: repoPath, Worktrees: worktrees}
+	}
 }
 
 func (m Model) fetchBranches() tea.Cmd {
@@ -885,6 +945,20 @@ func (m Model) ensureRepoVisible() Model {
 	}
 	if m.selected >= m.repoScroll+contentHeight {
 		m.repoScroll = m.selected - contentHeight + 1
+	}
+	return m
+}
+
+func (m Model) ensureWorktreeVisible() Model {
+	contentHeight := m.height - ui.BranchContentOverhead
+	if contentHeight <= 0 {
+		contentHeight = 16
+	}
+	if m.worktreeScroll > m.worktreeSelected {
+		m.worktreeScroll = m.worktreeSelected
+	}
+	if m.worktreeSelected >= m.worktreeScroll+contentHeight {
+		m.worktreeScroll = m.worktreeSelected - contentHeight + 1
 	}
 	return m
 }

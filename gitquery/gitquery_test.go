@@ -839,3 +839,196 @@ func TestFlattenBranches_TwoPathsExpandsToTwoRows(t *testing.T) {
 		t.Errorf("expansion row should retain branch name, got %q", rows[1].Branch.Name)
 	}
 }
+
+// --- ListWorktrees ---
+
+func TestListWorktrees_ReturnsMainFirst(t *testing.T) {
+	repo := realPath(t, initBranchRepo(t))
+
+	wtDir := realPath(t, t.TempDir())
+	wtPath := filepath.Join(wtDir, "wt-feature")
+	run(t, repo, "git", "branch", "wt-branch")
+	run(t, repo, "git", "worktree", "add", wtPath, "wt-branch")
+
+	wts, err := gitquery.ListWorktrees(repo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(wts) != 2 {
+		t.Fatalf("expected 2 worktrees, got %d", len(wts))
+	}
+
+	// First entry is the main worktree
+	if !wts[0].IsMain {
+		t.Error("first worktree should be IsMain")
+	}
+	if wts[0].Path != repo {
+		t.Errorf("main worktree path: expected %q, got %q", repo, wts[0].Path)
+	}
+
+	// Second entry is the added worktree
+	if wts[1].IsMain {
+		t.Error("second worktree should not be IsMain")
+	}
+	if wts[1].BranchName != "wt-branch" {
+		t.Errorf("expected BranchName 'wt-branch', got %q", wts[1].BranchName)
+	}
+	if wts[1].Path != wtPath {
+		t.Errorf("expected path %q, got %q", wtPath, wts[1].Path)
+	}
+	if wts[1].Detached {
+		t.Error("named branch worktree should not be Detached")
+	}
+}
+
+func TestListWorktrees_MainBranchNamePopulated(t *testing.T) {
+	repo := realPath(t, initBranchRepo(t))
+
+	wts, err := gitquery.ListWorktrees(repo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(wts) != 1 {
+		t.Fatalf("expected 1 worktree, got %d", len(wts))
+	}
+
+	defaultBranch := strings.TrimSpace(run(t, repo, "git", "branch", "--show-current"))
+	if wts[0].BranchName != defaultBranch {
+		t.Errorf("expected BranchName %q, got %q", defaultBranch, wts[0].BranchName)
+	}
+}
+
+func TestListWorktrees_InvalidPath(t *testing.T) {
+	_, err := gitquery.ListWorktrees("/no/such/path")
+	if err == nil {
+		t.Error("expected error for invalid path")
+	}
+}
+
+func TestListWorktrees_DetachedWorktree(t *testing.T) {
+	repo := realPath(t, initBranchRepo(t))
+	wtDir := realPath(t, t.TempDir())
+	wtPath := filepath.Join(wtDir, "wt-detached")
+	run(t, repo, "git", "worktree", "add", "--detach", wtPath)
+
+	wts, err := gitquery.ListWorktrees(repo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Find the detached worktree
+	var detached *gitquery.Worktree
+	for i := range wts {
+		if wts[i].Path == wtPath {
+			detached = &wts[i]
+			break
+		}
+	}
+	if detached == nil {
+		t.Fatal("detached worktree not found")
+	}
+	if !detached.Detached {
+		t.Error("expected Detached = true")
+	}
+	if detached.BranchName != "" {
+		t.Errorf("expected empty BranchName for detached, got %q", detached.BranchName)
+	}
+}
+
+func TestListWorktrees_StaleWorktree(t *testing.T) {
+	repo := realPath(t, initBranchRepo(t))
+	wtDir := realPath(t, t.TempDir())
+	wtPath := filepath.Join(wtDir, "wt-stale")
+	run(t, repo, "git", "branch", "stale-branch")
+	run(t, repo, "git", "worktree", "add", wtPath, "stale-branch")
+
+	// Remove the worktree directory without git worktree remove
+	if err := os.RemoveAll(wtPath); err != nil {
+		t.Fatal(err)
+	}
+
+	wts, err := gitquery.ListWorktrees(repo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var staleWt *gitquery.Worktree
+	for i := range wts {
+		if wts[i].BranchName == "stale-branch" {
+			staleWt = &wts[i]
+			break
+		}
+	}
+	if staleWt == nil {
+		t.Fatal("stale worktree not found")
+	}
+	if !staleWt.Stale {
+		t.Error("expected Stale = true for removed worktree directory")
+	}
+}
+
+func TestListWorktrees_DirtyWorktree(t *testing.T) {
+	repo := realPath(t, initBranchRepo(t))
+	wtDir := realPath(t, t.TempDir())
+	wtPath := filepath.Join(wtDir, "wt-dirty")
+	run(t, repo, "git", "branch", "dirty-branch")
+	run(t, repo, "git", "worktree", "add", wtPath, "dirty-branch")
+
+	// Modify an existing tracked file
+	writeFile(t, wtPath, "README.md", "changed content\nnew line\n")
+
+	wts, err := gitquery.ListWorktrees(repo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var dirtyWt *gitquery.Worktree
+	for i := range wts {
+		if wts[i].BranchName == "dirty-branch" {
+			dirtyWt = &wts[i]
+			break
+		}
+	}
+	if dirtyWt == nil {
+		t.Fatal("dirty worktree not found")
+	}
+	if !dirtyWt.Dirty {
+		t.Error("expected Dirty = true")
+	}
+	if dirtyWt.FilesChanged == 0 {
+		t.Error("expected FilesChanged > 0")
+	}
+	if dirtyWt.LinesAdded == 0 {
+		t.Error("expected LinesAdded > 0")
+	}
+}
+
+func TestListWorktrees_CleanWorktree(t *testing.T) {
+	repo := realPath(t, initBranchRepo(t))
+	wtDir := realPath(t, t.TempDir())
+	wtPath := filepath.Join(wtDir, "wt-clean")
+	run(t, repo, "git", "branch", "clean-branch")
+	run(t, repo, "git", "worktree", "add", wtPath, "clean-branch")
+
+	wts, err := gitquery.ListWorktrees(repo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var cleanWt *gitquery.Worktree
+	for i := range wts {
+		if wts[i].BranchName == "clean-branch" {
+			cleanWt = &wts[i]
+			break
+		}
+	}
+	if cleanWt == nil {
+		t.Fatal("clean worktree not found")
+	}
+	if cleanWt.Dirty {
+		t.Error("expected Dirty = false for clean worktree")
+	}
+	if cleanWt.FilesChanged != 0 {
+		t.Errorf("expected FilesChanged = 0, got %d", cleanWt.FilesChanged)
+	}
+}

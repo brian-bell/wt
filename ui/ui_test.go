@@ -820,3 +820,156 @@ func TestCommitPane_ScrollsToSelectedCommit(t *testing.T) {
 		t.Error("expected 'commit-9' not visible after scroll")
 	}
 }
+
+// --- Worktree pane ---
+
+func TestWorktreePane_ShowsBranchName(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", BranchName: "main", IsMain: true},
+		{Path: "/dev/alpha-feat", BranchName: "feature"},
+	}
+	lines := renderWorktreePane(wts, -1, 0, 80, 10)
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "main") {
+		t.Error("expected 'main' branch name in worktree pane")
+	}
+	if !strings.Contains(joined, "feature") {
+		t.Error("expected 'feature' branch name in worktree pane")
+	}
+}
+
+func TestWorktreePane_DetachedLabel(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/detached", Detached: true},
+	}
+	lines := renderWorktreePane(wts, -1, 0, 80, 10)
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "(detached)") {
+		t.Error("expected '(detached)' label for detached worktree")
+	}
+}
+
+func TestWorktreePane_RootAnnotation(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", BranchName: "main", IsMain: true},
+	}
+	lines := renderWorktreePane(wts, -1, 0, 80, 10)
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "[root]") {
+		t.Error("expected '[root]' annotation for main worktree")
+	}
+}
+
+func TestWorktreePane_ShowsPath(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha-feat", BranchName: "feat"},
+	}
+	lines := renderWorktreePane(wts, -1, 0, 80, 10)
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "/dev/alpha-feat") {
+		t.Error("expected worktree path in output")
+	}
+}
+
+func TestWorktreePane_DirtyIndicators(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", BranchName: "dirty", Dirty: true, FilesChanged: 3, LinesAdded: 10, LinesDeleted: 5},
+	}
+	lines := renderWorktreePane(wts, -1, 0, 80, 10)
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "3 files") {
+		t.Error("expected '3 files' in dirty indicator")
+	}
+	if !strings.Contains(joined, "+10") {
+		t.Error("expected '+10' lines added in dirty indicator")
+	}
+	if !strings.Contains(joined, "-5") {
+		t.Error("expected '-5' lines deleted in dirty indicator")
+	}
+}
+
+func TestWorktreePane_CleanCheckmark(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", BranchName: "clean"},
+	}
+	lines := renderWorktreePane(wts, -1, 0, 80, 10)
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "✔") {
+		t.Error("expected checkmark for clean worktree")
+	}
+}
+
+func TestWorktreePane_StaleIndicator(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/gone", BranchName: "stale-branch", Stale: true},
+	}
+	lines := renderWorktreePane(wts, -1, 0, 80, 10)
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "✗") {
+		t.Error("expected cross mark for stale worktree")
+	}
+	if !strings.Contains(joined, "stale") {
+		t.Error("expected 'stale' label for stale worktree")
+	}
+}
+
+func TestWorktreePane_CursorHighlight(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", BranchName: "main", IsMain: true},
+		{Path: "/dev/alpha-feat", BranchName: "feat"},
+	}
+	lines := renderWorktreePane(wts, 1, 0, 80, 10)
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "> feat") {
+		t.Error("expected '> feat' cursor on second item")
+	}
+}
+
+func TestWorktreePane_ScrollOffset(t *testing.T) {
+	wts := make([]gitquery.Worktree, 10)
+	for i := range wts {
+		wts[i] = gitquery.Worktree{Path: fmt.Sprintf("/dev/wt-%d", i), BranchName: fmt.Sprintf("branch-%d", i)}
+	}
+	lines := renderWorktreePane(wts, 9, 8, 80, 3)
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "branch-9") {
+		t.Error("expected 'branch-9' visible at scroll=8")
+	}
+	if strings.Contains(joined, "branch-0") {
+		t.Error("expected 'branch-0' not visible at scroll=8")
+	}
+}
+
+func TestStatusBar_WorktreesModeShowsNavHints(t *testing.T) {
+	bar := RenderStatusBar(120, 1, 0, 1, false, false)
+	for _, hint := range []string{"tab: pane", "q/esc: quit", "↑/↓ select"} {
+		if !strings.Contains(bar, hint) {
+			t.Errorf("worktrees mode status bar should contain %q", hint)
+		}
+	}
+}
+
+func TestRender_WorktreesModeShowsData(t *testing.T) {
+	view := Render(RenderParams{
+		Repos:    []scanner.Repo{{Path: "/a", DisplayName: "alpha"}},
+		Selected: 0,
+		Width:    80,
+		Height:   10,
+		Mode:     1,
+		Worktrees: []gitquery.Worktree{
+			{Path: "/a", BranchName: "main", IsMain: true},
+			{Path: "/a-feat", BranchName: "feat"},
+		},
+		WorktreeSelected: 0,
+		ActivePane:       1,
+	})
+	if !strings.Contains(view, "main") {
+		t.Error("render should contain worktree branch name 'main'")
+	}
+	if !strings.Contains(view, "feat") {
+		t.Error("render should contain worktree branch name 'feat'")
+	}
+	if strings.Contains(view, "nothing here yet") {
+		t.Error("render should not show placeholder when worktree data exists")
+	}
+}

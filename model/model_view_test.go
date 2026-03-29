@@ -314,3 +314,24 @@ func TestModel_ViewDestructiveModeHidesDestructiveHint(t *testing.T) {
 		t.Error("destructive mode should NOT show 'D: destructive mode' hint")
 	}
 }
+
+func TestModel_ViewWorktreesModeShowsWorktreeContent(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", BranchName: "main", IsMain: true},
+		{Path: "/dev/alpha-feat", BranchName: "feature-x"},
+	}
+	m, _ = update(m, model.WorktreeResultMsg{RepoPath: "/dev/alpha", Worktrees: wts})
+
+	view := m.View()
+	if !strings.Contains(view, "main") {
+		t.Error("view should contain worktree branch 'main'")
+	}
+	if !strings.Contains(view, "feature-x") {
+		t.Error("view should contain worktree branch 'feature-x'")
+	}
+	if !strings.Contains(view, "[root]") {
+		t.Error("view should contain '[root]' annotation for main worktree")
+	}
+}
