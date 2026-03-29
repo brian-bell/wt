@@ -1015,27 +1015,6 @@ func TestModel_StaleBranchDeletedMsgIgnored(t *testing.T) {
 	}
 }
 
-func TestModel_WorktreeRemovedMsgTriggersBranchFetch(t *testing.T) {
-	m := model.New(testRepos())
-	_, cmd := update(m, model.WorktreeRemovedMsg{RepoPath: "/dev/alpha"})
-	if cmd == nil {
-		t.Fatal("expected fetchBranches cmd after WorktreeRemovedMsg, got nil")
-	}
-	msg := cmd()
-	if _, ok := msg.(model.BranchResultMsg); !ok {
-		t.Errorf("expected BranchResultMsg, got %T", msg)
-	}
-}
-
-func TestModel_StaleWorktreeRemovedMsgIgnored(t *testing.T) {
-	m := model.New(testRepos())
-	m = selectBravo(m) // selected=bravo
-	_, cmd := update(m, model.WorktreeRemovedMsg{RepoPath: "/dev/alpha"})
-	if cmd != nil {
-		t.Error("expected stale WorktreeRemovedMsg to be ignored (no fetch cmd)")
-	}
-}
-
 func TestModel_StashDroppedMsgTriggersStashFetch(t *testing.T) {
 	m := model.New(testRepos())
 	_, cmd := update(m, model.StashDroppedMsg{RepoPath: "/dev/alpha"})
@@ -1151,5 +1130,69 @@ func TestModel_StaleStashDroppedMsgIgnored(t *testing.T) {
 	_, cmd := update(m, model.StashDroppedMsg{RepoPath: "/dev/alpha"})
 	if cmd != nil {
 		t.Error("expected stale StashDroppedMsg to be ignored")
+	}
+}
+
+// --- Branch filtering ---
+
+func TestModel_WorktreeBranchesFilteredFromBranchView(t *testing.T) {
+	m := model.New(testRepos())
+	m = inBranchesMode(m)
+	branches := []gitquery.Branch{
+		{Name: "feat-a"},
+		{Name: "main", IsWorktree: true, WorktreePaths: []string{"/dev/alpha"}},
+		{Name: "wt-branch", IsWorktree: true, WorktreePaths: []string{"/dev/alpha-wt"}},
+		{Name: "feat-b"},
+	}
+	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
+
+	rows := m.Rows()
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 rows (root + 2 non-worktree), got %d", len(rows))
+	}
+	for _, row := range rows {
+		if row.Branch.Name == "wt-branch" {
+			t.Error("non-root worktree branch should be filtered out")
+		}
+	}
+}
+
+func TestModel_RootBranchPinnedToPositionZero(t *testing.T) {
+	m := model.New(testRepos())
+	m = inBranchesMode(m)
+	branches := []gitquery.Branch{
+		{Name: "aaa-branch"},
+		{Name: "mmm-branch"},
+		{Name: "zzz-root", IsWorktree: true, WorktreePaths: []string{"/dev/alpha"}},
+	}
+	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
+
+	rows := m.Rows()
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 rows, got %d", len(rows))
+	}
+	if rows[0].Branch.Name != "zzz-root" {
+		t.Errorf("expected root branch pinned to position 0, got %q", rows[0].Branch.Name)
+	}
+	if rows[0].WorktreePath != "/dev/alpha" {
+		t.Errorf("expected root row WorktreePath=/dev/alpha, got %q", rows[0].WorktreePath)
+	}
+}
+
+func TestModel_NoRootBranchDoesNotPanic(t *testing.T) {
+	m := model.New(testRepos())
+	m = inBranchesMode(m)
+	branches := []gitquery.Branch{
+		{Name: "feat-a"},
+		{Name: "feat-b"},
+	}
+	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
+
+	rows := m.Rows()
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(rows))
+	}
+	if rows[0].Branch.Name != "feat-a" {
+		t.Errorf("expected original order preserved, got %q first", rows[0].Branch.Name)
 	}
 }
