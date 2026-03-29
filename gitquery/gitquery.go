@@ -106,18 +106,22 @@ func ListWorktrees(repoPath string) ([]Worktree, error) {
 			w.BranchName = wt.branch
 		}
 		first = false
-
-		// Detect stale worktrees
-		stale := checkStale([]string{w.Path})
-		w.Stale = stale[0]
-
-		// Populate dirty status for non-stale worktrees
-		if !w.Stale {
-			populateWorktreeDirtyStatus(&w)
-		}
-
 		worktrees = append(worktrees, w)
 	}
+
+	// Batch stale detection for all worktrees
+	paths := make([]string, len(worktrees))
+	for i := range worktrees {
+		paths[i] = worktrees[i].Path
+	}
+	staleFlags := checkStale(paths)
+	for i := range worktrees {
+		worktrees[i].Stale = staleFlags[i]
+		if !worktrees[i].Stale {
+			populateWorktreeDirtyStatus(&worktrees[i])
+		}
+	}
+
 	return worktrees, nil
 }
 
