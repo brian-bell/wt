@@ -19,8 +19,8 @@ func TestModel_EnterStillRequiresDirtyWorktree(t *testing.T) {
 		{Name: "clean-2"},
 	}
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
-	m = inRightPane(m)
 
 	// Cursor at clean-1 (index 0): enter is no-op
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyEnter})
@@ -62,8 +62,8 @@ func TestModel_EnterOpensBranchDiffOverlayForDirtyWorktree(t *testing.T) {
 		},
 		{Name: "main"},
 	}
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
-	m = inRightPane(m)
 
 	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.Overlay() != model.OverlayBranchDiff {
@@ -87,8 +87,8 @@ func TestModel_EnterDoesNothingForCleanBranch(t *testing.T) {
 			Dirty:      false,
 		},
 	}
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
-	m = inRightPane(m)
 
 	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.Overlay() != model.OverlayNone {
@@ -101,16 +101,16 @@ func TestModel_EnterDoesNothingForCleanBranch(t *testing.T) {
 
 // --- History (mode 3) actions ---
 
-func modelInMode3WithCommits() model.Model {
+func modelInHistoryWithCommits() model.Model {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m, _ = update(m, model.CommitResultMsg{RepoPath: "/dev/alpha", Commits: testCommits()})
 	return m
 }
 
 func TestModel_EnterInHistoryOpensCommitDiffOverlay(t *testing.T) {
-	m := modelInMode3WithCommits()
+	m := modelInHistoryWithCommits()
 	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.Overlay() != model.OverlayCommitDiff {
 		t.Errorf("expected OverlayCommitDiff, got %d", m.Overlay())
@@ -127,7 +127,7 @@ func TestModel_EnterInHistoryOpensCommitDiffOverlay(t *testing.T) {
 func TestModel_EnterInHistoryNoCommitsIsNoOp(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	// No commits loaded
 	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.Overlay() != model.OverlayNone {
@@ -156,15 +156,15 @@ func TestModel_StaleCommitDiffResultDiscarded(t *testing.T) {
 	}
 }
 
-func TestModel_YKeyCopiesHashInMode3(t *testing.T) {
-	m := modelInMode3WithCommits()
+func TestModel_YKeyCopiesHashInHistoryMode(t *testing.T) {
+	m := modelInHistoryWithCommits()
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
 	if cmd == nil {
 		t.Error("expected non-nil cmd for y key in mode 3")
 	}
 }
 
-func TestModel_YKeyNoOpInMode1(t *testing.T) {
+func TestModel_YKeyNoOpInWorktreesMode(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
@@ -176,7 +176,7 @@ func TestModel_YKeyNoOpInMode1(t *testing.T) {
 func TestModel_YKeyNoOpWithNoCommits(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
 	if cmd != nil {
 		t.Errorf("expected nil cmd for y key with no commits, got %T", cmd)
@@ -184,7 +184,7 @@ func TestModel_YKeyNoOpWithNoCommits(t *testing.T) {
 }
 
 func TestModel_DKeyNoOpInHistoryMode(t *testing.T) {
-	m := modelInMode3WithCommits()
+	m := modelInHistoryWithCommits()
 	m = enableDestructive(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	if m.Overlay() != model.OverlayNone {
@@ -193,7 +193,7 @@ func TestModel_DKeyNoOpInHistoryMode(t *testing.T) {
 }
 
 func TestModel_TKeyInHistoryFiresCmd(t *testing.T) {
-	m := modelInMode3WithCommits()
+	m := modelInHistoryWithCommits()
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
 	if cmd == nil {
 		t.Error("expected non-nil cmd for t key in history mode")
@@ -201,7 +201,7 @@ func TestModel_TKeyInHistoryFiresCmd(t *testing.T) {
 }
 
 func TestModel_CKeyInHistoryFiresCmd(t *testing.T) {
-	m := modelInMode3WithCommits()
+	m := modelInHistoryWithCommits()
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
 	if cmd == nil {
 		t.Error("expected non-nil cmd for c key in history mode")
@@ -213,7 +213,7 @@ func TestModel_CKeyInHistoryFiresCmd(t *testing.T) {
 func TestModel_EnterOpensOverlay(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.Overlay() != model.OverlayStashDiff {
@@ -239,7 +239,7 @@ func TestModel_StashDiffResultStoresDiff(t *testing.T) {
 func TestModel_EscClosesOverlay(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
 	// Now close overlay with esc
@@ -258,7 +258,7 @@ func TestModel_EscClosesOverlay(t *testing.T) {
 func TestModel_QClosesOverlayNotQuit(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
 	// Close with q
@@ -277,7 +277,7 @@ func TestModel_QClosesOverlayNotQuit(t *testing.T) {
 func TestModel_OverlayScrollUpDown(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
 	m, _ = update(m, model.StashDiffResultMsg{RepoPath: "/dev/alpha", Index: 0, Diff: "line1\nline2\nline3"})
@@ -300,13 +300,13 @@ func TestModel_OverlayScrollUpDown(t *testing.T) {
 func TestModel_ModeKeysIgnoredInOverlay(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
 	// Press "1" — should not change mode
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
-	if m.Mode() != 2 {
-		t.Errorf("expected mode unchanged at 2, got %d", m.Mode())
+	if m.Mode() != 3 {
+		t.Errorf("expected mode unchanged at 3 (stashes), got %d", m.Mode())
 	}
 	if m.Overlay() != model.OverlayStashDiff {
 		t.Errorf("expected overlay still open, got %d", m.Overlay())
@@ -317,13 +317,13 @@ func TestModel_ModeKeysIgnoredInOverlay(t *testing.T) {
 
 func TestModel_DKeyNoOpInReadOnlyMode(t *testing.T) {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{
 			{Name: "feat", IsWorktree: true, Dirty: true, WorktreePaths: []string{"/dev/alpha/feat"}},
 		},
 	})
-	m = inRightPane(m)
 	// d should be no-op in read-only mode (default)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	if m.Overlay() != model.OverlayNone {
@@ -345,13 +345,13 @@ func TestModel_ShiftDTogglesDestructiveOn(t *testing.T) {
 
 func TestModel_DKeyWorksInDestructiveMode(t *testing.T) {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{
 			{Name: "feat", IsWorktree: true, Dirty: true, WorktreePaths: []string{"/dev/alpha/feat"}},
 		},
 	})
-	m = inRightPane(m)
 	// Enable destructive mode
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
 	// Now d should work
@@ -364,7 +364,7 @@ func TestModel_DKeyWorksInDestructiveMode(t *testing.T) {
 func TestModel_DKeyNoOpInReadOnlyModeStashes(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	if m.Overlay() != model.OverlayNone {
@@ -419,13 +419,13 @@ func TestModel_ShiftDNoOpDuringConfirmOverlay(t *testing.T) {
 
 func TestModel_ShiftDNoOpDuringDiffOverlay(t *testing.T) {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{
 			{Name: "feat", IsWorktree: true, Dirty: true, WorktreePaths: []string{"/dev/alpha/feat"}},
 		},
 	})
-	m = inRightPane(m)
 	// Open diff overlay
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.Overlay() == model.OverlayNone {
@@ -457,11 +457,11 @@ func enableDestructive(m model.Model) model.Model {
 
 func modelWithWorktreeBranch() model.Model {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{worktreeBranch()},
 	})
-	m = inRightPane(m)
 	m = enableDestructive(m)
 	return m
 }
@@ -479,11 +479,11 @@ func TestModel_DKeyOpensConfirmOverlay(t *testing.T) {
 
 func TestModel_DKeyOnNonWorktreeBranchOpensDeleteConfirm(t *testing.T) {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{{Name: "main"}},
 	})
-	m = inRightPane(m)
 	m = enableDestructive(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	if m.Overlay() != model.OverlayConfirm {
@@ -610,11 +610,11 @@ func TestModel_WorktreeRemoveFailReturnsDeleteFailedMsg(t *testing.T) {
 func TestModel_BranchDeleteFailReturnsDeleteFailedMsg(t *testing.T) {
 	// With a fake repo path, DeleteBranch will fail → returns DeleteFailedMsg
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{{Name: "feat"}},
 	})
-	m = inRightPane(m)
 	m = enableDestructive(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
@@ -716,7 +716,7 @@ func TestModel_ForceConfirmWorktreeYReturnsWorktreeRemovedMsg(t *testing.T) {
 func TestModel_ConfirmDialogBlocksModeSwitch(t *testing.T) {
 	m := modelWithWorktreeBranch()
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	if m.Mode() != model.ModeBranches {
 		t.Errorf("confirm dialog should block mode switch, mode changed to %d", m.Mode())
 	}
@@ -724,17 +724,17 @@ func TestModel_ConfirmDialogBlocksModeSwitch(t *testing.T) {
 
 // --- Stash drop ---
 
-func modelInMode2WithStashes() model.Model {
+func modelInStashesWithStashes() model.Model {
 	m := model.New(testRepos())
 	m = inRightPane(m)
 	m = enableDestructive(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	return m
 }
 
-func TestModel_DKeyInMode2OpensConfirmDialog(t *testing.T) {
-	m := modelInMode2WithStashes()
+func TestModel_DKeyInStashesModeOpensConfirmDialog(t *testing.T) {
+	m := modelInStashesWithStashes()
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	if m.Overlay() != model.OverlayConfirm {
 		t.Errorf("expected OverlayConfirm, got %d", m.Overlay())
@@ -744,10 +744,10 @@ func TestModel_DKeyInMode2OpensConfirmDialog(t *testing.T) {
 	}
 }
 
-func TestModel_DKeyInMode2WithNoStashesDoesNothing(t *testing.T) {
+func TestModel_DKeyInStashesModeWithNoStashesDoesNothing(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	// No stashes loaded
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	if m.Overlay() != model.OverlayNone {
@@ -756,7 +756,7 @@ func TestModel_DKeyInMode2WithNoStashesDoesNothing(t *testing.T) {
 }
 
 func TestModel_StashDropConfirmReturnsStashDroppedMsg(t *testing.T) {
-	m := modelInMode2WithStashes()
+	m := modelInStashesWithStashes()
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
 	if cmd == nil {
@@ -781,11 +781,11 @@ func staleBranch() gitquery.Branch {
 
 func modelWithStaleBranch() model.Model {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{staleBranch()},
 	})
-	m = inRightPane(m)
 	m = enableDestructive(m)
 	return m
 }
@@ -806,11 +806,11 @@ func TestModel_PKeyOnStaleWorktreeOpensConfirm(t *testing.T) {
 
 func TestModel_PKeyNoOpWithoutDestructiveMode(t *testing.T) {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{staleBranch()},
 	})
-	m = inRightPane(m)
 	// destructive mode NOT enabled
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
 	if m.Overlay() != model.OverlayNone {
@@ -828,11 +828,11 @@ func TestModel_PKeyNoOpOnNonStaleWorktree(t *testing.T) {
 
 func TestModel_PKeyNoOpOnNonWorktreeBranch(t *testing.T) {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{{Name: "plain"}},
 	})
-	m = inRightPane(m)
 	m = enableDestructive(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
 	if m.Overlay() != model.OverlayNone {
@@ -872,13 +872,13 @@ func TestModel_WorktreePrunedMsgRefreshesBranches(t *testing.T) {
 
 func TestModel_TKey_WorktreeBranch_FiresCmd(t *testing.T) {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{
 			{Name: "main", IsWorktree: true, WorktreePaths: []string{"/dev/alpha"}},
 		},
 	})
-	m = inRightPane(m)
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
 	if cmd == nil {
 		t.Error("expected non-nil cmd when pressing t on a worktree branch")
@@ -887,13 +887,13 @@ func TestModel_TKey_WorktreeBranch_FiresCmd(t *testing.T) {
 
 func TestModel_CKey_WorktreeBranch_FiresCmd(t *testing.T) {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{
 			{Name: "main", IsWorktree: true, WorktreePaths: []string{"/dev/alpha"}},
 		},
 	})
-	m = inRightPane(m)
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
 	if cmd == nil {
 		t.Error("expected non-nil cmd when pressing c on a worktree branch")
@@ -902,13 +902,13 @@ func TestModel_CKey_WorktreeBranch_FiresCmd(t *testing.T) {
 
 func TestModel_TKey_NonWorktreeBranch_NoCmd(t *testing.T) {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{
 			{Name: "stale-branch"},
 		},
 	})
-	m = inRightPane(m)
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'t'}})
 	if cmd != nil {
 		t.Error("expected nil cmd when pressing t on a non-worktree branch")
@@ -917,13 +917,13 @@ func TestModel_TKey_NonWorktreeBranch_NoCmd(t *testing.T) {
 
 func TestModel_CKey_NonWorktreeBranch_NoCmd(t *testing.T) {
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{
 		RepoPath: "/dev/alpha",
 		Branches: []gitquery.Branch{
 			{Name: "stale-branch"},
 		},
 	})
-	m = inRightPane(m)
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
 	if cmd != nil {
 		t.Error("expected nil cmd when pressing c on a non-worktree branch")
@@ -935,12 +935,12 @@ func TestModel_CKey_NonWorktreeBranch_NoCmd(t *testing.T) {
 func TestModel_MultiWorktreeExpandsToRows(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = inBranchesMode(m)
 	// Branch with 2 worktree paths — should expand to 2 navigable rows
 	branches := []gitquery.Branch{
 		{Name: "feat", IsWorktree: true, WorktreePaths: []string{"/dev/feat-A", "/dev/feat-B"}},
 	}
 	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
-	m = inRightPane(m)
 	if m.BranchSelected() != 0 {
 		t.Errorf("expected cursor at 0 initially, got %d", m.BranchSelected())
 	}
@@ -959,11 +959,11 @@ func TestModel_MultiWorktreeExpandsToRows(t *testing.T) {
 func TestModel_DKeyOnExpansionRowTargetsSpecificPath(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = inBranchesMode(m)
 	branches := []gitquery.Branch{
 		{Name: "feat", IsWorktree: true, WorktreePaths: []string{"/dev/feat-A", "/dev/feat-B"}},
 	}
 	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
-	m = inRightPane(m)
 	m = enableDestructive(m)
 	// Navigate to expansion row (index 1 = /dev/feat-B)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})

@@ -48,6 +48,13 @@ func selectBravo(m model.Model) model.Model {
 	return m
 }
 
+// inBranchesMode switches to right pane and selects branches mode (mode 2).
+func inBranchesMode(m model.Model) model.Model {
+	m = inRightPane(m)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	return m
+}
+
 // --- Init & basics ---
 
 func TestModel_InitialActivePaneIsLeft(t *testing.T) {
@@ -64,22 +71,31 @@ func TestModel_InitialSelection(t *testing.T) {
 	}
 }
 
-func TestModel_DefaultModeIsBranches(t *testing.T) {
+func TestModel_DefaultModeIsWorktrees(t *testing.T) {
 	m := model.New(testRepos())
 	if m.Mode() != 1 {
-		t.Errorf("expected default mode 1, got %d", m.Mode())
+		t.Errorf("expected default mode ModeWorktrees (1), got %d", m.Mode())
 	}
 }
 
-func TestModel_InitFiresFetchBranches(t *testing.T) {
+func TestModel_InitReturnsNilForWorktreesMode(t *testing.T) {
 	m := model.New(testRepos())
 	cmd := m.Init()
+	if cmd != nil {
+		t.Error("Init should return nil for ModeWorktrees (no data to fetch yet)")
+	}
+}
+
+func TestModel_SwitchToBranchesFiresFetch(t *testing.T) {
+	m := model.New(testRepos())
+	m = inRightPane(m)
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
 	if cmd == nil {
-		t.Fatal("expected fetchBranches cmd from Init, got nil")
+		t.Fatal("expected fetchBranches cmd from switch to mode 2, got nil")
 	}
 	msg := cmd()
 	if _, ok := msg.(model.BranchResultMsg); !ok {
-		t.Errorf("expected BranchResultMsg from Init, got %T", msg)
+		t.Errorf("expected BranchResultMsg, got %T", msg)
 	}
 }
 
@@ -142,10 +158,10 @@ func TestModel_TabTogglesPaneFocus(t *testing.T) {
 func TestModel_TabDoesNotChangeMode(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})                       // left → right
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}}) // mode 2
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}}) // mode 3 (stashes)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})                       // right → left
-	if m.Mode() != 2 {
-		t.Errorf("expected mode unchanged at 2, got %d", m.Mode())
+	if m.Mode() != 3 {
+		t.Errorf("expected mode unchanged at 3, got %d", m.Mode())
 	}
 }
 
@@ -153,12 +169,20 @@ func TestModel_TabDoesNotChangeMode(t *testing.T) {
 
 func TestModel_LeftPaneDownNavigatesRepos(t *testing.T) {
 	m := model.New(testRepos())
-	m, cmd := update(m, tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
 	if m.Selected() != 1 {
 		t.Errorf("expected selected 1 after down in left pane, got %d", m.Selected())
 	}
+}
+
+func TestModel_LeftPaneDownFiresFetchInBranchMode(t *testing.T) {
+	m := model.New(testRepos())
+	m = inRightPane(m)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}}) // branches
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})                       // back to left pane
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyDown})
 	if cmd == nil {
-		t.Error("expected fetch cmd after repo navigation, got nil")
+		t.Error("expected fetch cmd after repo navigation in branches mode, got nil")
 	}
 }
 
@@ -211,7 +235,7 @@ func TestModel_RepoSwitchClearsRightPaneData(t *testing.T) {
 
 func TestModel_LeftPaneDownResetsRightPaneCursors(t *testing.T) {
 	m := model.New(testRepos())
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab}) // switch to right pane
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: []gitquery.Branch{
 		{Name: "a"}, {Name: "b"}, {Name: "c"},
 	}})
@@ -281,8 +305,8 @@ func TestModel_UpDownNavigatesAllBranches(t *testing.T) {
 		{Name: "dirty-2", IsWorktree: true, Dirty: true, WorktreePaths: []string{"/dev/alpha"}},
 	}
 	m := model.New(testRepos())
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
-	m = inRightPane(m)
 
 	if m.BranchSelected() != 0 {
 		t.Errorf("expected cursor at 0, got %d", m.BranchSelected())
@@ -314,7 +338,7 @@ func TestModel_UpDownNavigatesAllBranches(t *testing.T) {
 func TestModel_StashCursorWraps(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	// Wrap backward from 0 to last
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
@@ -336,14 +360,13 @@ func TestModel_BranchScrollFollowsCursor(t *testing.T) {
 	}
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: ui.BranchContentOverhead + 3}) // 3 content lines
+	m = inBranchesMode(m)
 	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
 
 	// Cursor starts at 0, scroll at 0
 	if m.BranchScroll() != 0 {
 		t.Errorf("expected scroll 0 at start, got %d", m.BranchScroll())
 	}
-
-	m = inRightPane(m)
 	// Move cursor down past the viewport
 	for i := 0; i < 9; i++ {
 		m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
@@ -469,7 +492,7 @@ func TestModel_StashScrollFollowsCursor(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: ui.BranchContentOverhead + contentHeight})
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: stashes})
 
 	if m.StashScroll() != 0 {
@@ -520,7 +543,7 @@ func TestModel_StashScrollAccountsForLongMessages(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 50 + ui.LeftPaneWidth + 2, Height: ui.BranchContentOverhead + contentHeight})
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: stashes})
 
 	// Move to stash 2 (each takes 2 lines, so stash 2 starts at visual line 4)
@@ -540,32 +563,32 @@ func TestModel_StashScrollAccountsForLongMessages(t *testing.T) {
 func TestModel_ModeSwitchOnKeyPress(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
-	if m.Mode() != 2 {
-		t.Errorf("expected mode 2, got %d", m.Mode())
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	if m.Mode() != 3 {
+		t.Errorf("expected mode 3 (stashes), got %d", m.Mode())
 	}
 
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
 	if m.Mode() != 1 {
-		t.Errorf("expected mode 1, got %d", m.Mode())
+		t.Errorf("expected mode 1 (worktrees), got %d", m.Mode())
 	}
 }
 
-func TestModel_Key3SwitchesToHistoryMode(t *testing.T) {
+func TestModel_Key4SwitchesToHistoryMode(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
-	if m.Mode() != 3 {
-		t.Errorf("expected mode 3, got %d", m.Mode())
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
+	if m.Mode() != 4 {
+		t.Errorf("expected mode 4, got %d", m.Mode())
 	}
 }
 
-func TestModel_SwitchToMode3FiresFetchCommits(t *testing.T) {
+func TestModel_SwitchToHistoryFiresFetchCommits(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	if cmd == nil {
-		t.Fatal("expected fetchCommits cmd on switch to mode 3, got nil")
+		t.Fatal("expected fetchCommits cmd on switch to mode 4, got nil")
 	}
 	msg := cmd()
 	if _, ok := msg.(model.CommitResultMsg); !ok {
@@ -573,18 +596,48 @@ func TestModel_SwitchToMode3FiresFetchCommits(t *testing.T) {
 	}
 }
 
-func TestModel_Key4IsNoOp(t *testing.T) {
+func TestModel_NumberKeysSwitchToCorrectModes(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
+
+	// Key 2 → ModeBranches
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	if m.Mode() != 2 {
+		t.Errorf("key 2: expected mode 2 (ModeBranches), got %d", m.Mode())
+	}
+
+	// Key 3 → ModeStashes
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	if m.Mode() != 3 {
+		t.Errorf("key 3: expected mode 3 (ModeStashes), got %d", m.Mode())
+	}
+
+	// Key 4 → ModeHistory
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
+	if m.Mode() != 4 {
+		t.Errorf("key 4: expected mode 4 (ModeHistory), got %d", m.Mode())
+	}
+
+	// Key 1 → ModeWorktrees
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
+	if m.Mode() != 1 {
+		t.Errorf("key 1: expected mode 1 (ModeWorktrees), got %d", m.Mode())
+	}
+}
+
+func TestModel_Key5IsNoOp(t *testing.T) {
+	m := model.New(testRepos())
+	m = inRightPane(m)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'5'}})
 	if m.Mode() != 1 {
 		t.Errorf("expected mode unchanged at 1, got %d", m.Mode())
 	}
 }
 
-func TestModel_Pressing1WhileInMode1NoFetch(t *testing.T) {
+func TestModel_PressingCurrentModeKeyNoFetch(t *testing.T) {
 	m := model.New(testRepos())
-	// Already in mode 1; pressing 1 should not fire a redundant fetch
+	m = inRightPane(m)
+	// Already in mode 1 (worktrees); pressing 1 should not fire a redundant fetch
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
 	if cmd != nil {
 		t.Error("pressing 1 while already in mode 1 should not fire fetch")
@@ -595,28 +648,28 @@ func TestModel_ModeSwitchPreservesSelection(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})                      // select bravo (left pane)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyTab})                       // switch to right pane
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}}) // mode 2
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}}) // mode 3 (stashes)
 	if m.Selected() != 1 {
 		t.Errorf("expected selection preserved at 1, got %d", m.Selected())
 	}
 }
 
-func TestModel_RightSwitchesToMode2(t *testing.T) {
+func TestModel_RightFromWorktreesSwitchesToBranches(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
 	if m.Mode() != 2 {
-		t.Errorf("expected mode 2, got %d", m.Mode())
+		t.Errorf("expected mode 2 (branches), got %d", m.Mode())
 	}
 }
 
-func TestModel_LeftSwitchesToMode1(t *testing.T) {
+func TestModel_LeftFromBranchesSwitchesToWorktrees(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // branches
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})  // worktrees
 	if m.Mode() != 1 {
-		t.Errorf("expected mode 1, got %d", m.Mode())
+		t.Errorf("expected mode 1 (worktrees), got %d", m.Mode())
 	}
 }
 
@@ -625,74 +678,115 @@ func TestModel_HLSwitchModes(t *testing.T) {
 	m = inRightPane(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
 	if m.Mode() != 2 {
-		t.Errorf("expected mode 2, got %d", m.Mode())
+		t.Errorf("expected mode 2 (branches), got %d", m.Mode())
 	}
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
 	if m.Mode() != 1 {
-		t.Errorf("expected mode 1, got %d", m.Mode())
+		t.Errorf("expected mode 1 (worktrees), got %d", m.Mode())
+	}
+}
+
+func TestModel_RightCyclesThroughAllFourModes(t *testing.T) {
+	m := model.New(testRepos())
+	m = inRightPane(m)
+	// Start at ModeWorktrees (1)
+	if m.Mode() != 1 {
+		t.Fatalf("expected starting mode 1, got %d", m.Mode())
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // 2
+	if m.Mode() != 2 {
+		t.Errorf("expected mode 2 after first right, got %d", m.Mode())
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // 3
+	if m.Mode() != 3 {
+		t.Errorf("expected mode 3 after second right, got %d", m.Mode())
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // 4
+	if m.Mode() != 4 {
+		t.Errorf("expected mode 4 after third right, got %d", m.Mode())
+	}
+}
+
+func TestModel_LeftCyclesBackThroughAllFourModes(t *testing.T) {
+	m := model.New(testRepos())
+	m = inRightPane(m)
+	// Go to mode 4
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
+	// Left through 3, 2, 1
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft}) // 3
+	if m.Mode() != 3 {
+		t.Errorf("expected mode 3 after first left, got %d", m.Mode())
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft}) // 2
+	if m.Mode() != 2 {
+		t.Errorf("expected mode 2 after second left, got %d", m.Mode())
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft}) // 1
+	if m.Mode() != 1 {
+		t.Errorf("expected mode 1 after third left, got %d", m.Mode())
 	}
 }
 
 func TestModel_ModeClampsAtEdges(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	// Already at mode 1, left should stay at 1
+	// Already at mode 1 (ModeWorktrees), left should stay at 1
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})
 	if m.Mode() != 1 {
 		t.Errorf("expected mode 1 (clamped), got %d", m.Mode())
 	}
-	// Go to mode 3, right should stay at 3
+	// Go to mode 4 (ModeHistory), right should stay at 4
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // 2
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // 3
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // still 3
-	if m.Mode() != 3 {
-		t.Errorf("expected mode 3 (clamped), got %d", m.Mode())
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // 4
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // still 4
+	if m.Mode() != 4 {
+		t.Errorf("expected mode 4 (clamped), got %d", m.Mode())
 	}
 }
 
 func TestModel_RightFromStashesGoesToHistory(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}}) // stashes
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}}) // stashes
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})                     // history
-	if m.Mode() != 3 {
-		t.Errorf("expected mode 3, got %d", m.Mode())
+	if m.Mode() != 4 {
+		t.Errorf("expected mode 4, got %d", m.Mode())
 	}
 }
 
 func TestModel_LeftFromHistoryGoesToStashes(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}}) // history
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}}) // history
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyLeft})                      // stashes
-	if m.Mode() != 2 {
-		t.Errorf("expected mode 2, got %d", m.Mode())
+	if m.Mode() != 3 {
+		t.Errorf("expected mode 3, got %d", m.Mode())
 	}
 }
 
 func TestModel_ModeSwitchViaArrowFiresFetch(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	// Right to mode 2 should fetch stashes
+	// Right to mode 2 (branches) should fetch branches
 	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRight})
 	if cmd == nil {
-		t.Fatal("expected fetch cmd on mode switch to 2, got nil")
+		t.Fatal("expected fetch cmd on mode switch to branches, got nil")
 	}
-	// Left back to mode 1 should fetch worktrees
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
-	_, cmd = update(m, tea.KeyMsg{Type: tea.KeyLeft})
+	// Right to mode 3 (stashes) should fetch stashes
+	_, cmd = update(m, tea.KeyMsg{Type: tea.KeyRight})
 	if cmd == nil {
-		t.Fatal("expected fetch cmd on mode switch to 1, got nil")
+		t.Fatal("expected fetch cmd on mode switch to stashes, got nil")
 	}
 }
 
-func TestModel_Mode1SwitchFiresFetchBranches(t *testing.T) {
+func TestModel_SwitchToBranchesFiresFetchBranches(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}}) // stashes
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
 	if cmd == nil {
-		t.Fatal("expected fetch cmd on switch to mode 1, got nil")
+		t.Fatal("expected fetch cmd on switch to mode 2, got nil")
 	}
 	msg := cmd()
 	if _, ok := msg.(model.BranchResultMsg); !ok {
@@ -700,12 +794,12 @@ func TestModel_Mode1SwitchFiresFetchBranches(t *testing.T) {
 	}
 }
 
-func TestModel_SwitchToMode2FiresFetchStashes(t *testing.T) {
+func TestModel_SwitchToStashesFiresFetchStashes(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	if cmd == nil {
-		t.Fatal("expected fetchStashes cmd on switch to mode 2, got nil")
+		t.Fatal("expected fetchStashes cmd on switch to mode 3, got nil")
 	}
 	msg := cmd()
 	if _, ok := msg.(model.StashResultMsg); !ok {
@@ -857,7 +951,7 @@ func TestModel_StaleCommitResultDiscarded(t *testing.T) {
 func TestModel_CommitCursorWraps(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m, _ = update(m, model.CommitResultMsg{RepoPath: "/dev/alpha", Commits: testCommits()})
 	// Wrap backward from 0 to last
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
@@ -879,7 +973,7 @@ func TestModel_CommitScrollFollowsCursor(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: ui.BranchContentOverhead + 3})
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m, _ = update(m, model.CommitResultMsg{RepoPath: "/dev/alpha", Commits: commits})
 
 	// Move cursor past viewport
@@ -894,7 +988,7 @@ func TestModel_CommitScrollFollowsCursor(t *testing.T) {
 func TestModel_ModeSwitchResetsCommitCursors(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m, _ = update(m, model.CommitResultMsg{RepoPath: "/dev/alpha", Commits: testCommits()})
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
@@ -903,7 +997,7 @@ func TestModel_ModeSwitchResetsCommitCursors(t *testing.T) {
 	}
 	// Switch away and back
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	if m.CommitSelected() != 0 {
 		t.Errorf("expected CommitSelected reset to 0, got %d", m.CommitSelected())
 	}
@@ -912,7 +1006,7 @@ func TestModel_ModeSwitchResetsCommitCursors(t *testing.T) {
 func TestModel_RepoSwitchClearsCommits(t *testing.T) {
 	m := model.New(testRepos())
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m, _ = update(m, model.CommitResultMsg{RepoPath: "/dev/alpha", Commits: testCommits()})
 	if len(m.Commits()) != 3 {
 		t.Fatal("expected 3 commits")

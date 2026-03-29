@@ -149,11 +149,11 @@ func Render(p RenderParams) string {
 
 	var rightLines []string
 	switch {
-	case p.Mode == 1 && len(p.Branches) > 0:
+	case p.Mode == 2 && len(p.Branches) > 0:
 		rightLines = renderBranchPaneSelected(p.Branches, branchSel, p.BranchScroll, rightContentWidth, rightContentHeight, repoPath)
-	case p.Mode == 2 && len(p.Stashes) > 0:
+	case p.Mode == 3 && len(p.Stashes) > 0:
 		rightLines = renderStashPane(p.Stashes, stashSel, p.StashScroll, rightContentWidth, rightContentHeight)
-	case p.Mode == 3 && len(p.Commits) > 0:
+	case p.Mode == 4 && len(p.Commits) > 0:
 		rightLines = renderCommitPane(p.Commits, commitSel, p.CommitScroll, rightContentWidth, rightContentHeight)
 	default:
 		rightLines = renderPlaceholderPane(rightContentWidth, rightContentHeight)
@@ -178,9 +178,10 @@ func renderModeHeader(mode, width int) string {
 		key  int
 		name string
 	}{
-		{1, "branches"},
-		{2, "stashes"},
-		{3, "history"},
+		{1, "worktrees"},
+		{2, "branches"},
+		{3, "stashes"},
+		{4, "history"},
 	}
 
 	var parts []string
@@ -203,16 +204,16 @@ func RenderStatusBar(width, mode, overlay, activePane int, destructive, staleSel
 		hints = "  y: confirm  n/esc: cancel"
 	} else if overlay != 0 {
 		hints = "  ↑/↓ scroll  esc: close"
-	} else if mode == 3 {
+	} else if mode == 4 {
 		hints = "  tab: pane  q/esc: quit  ↑/↓ select  enter: diff  y: copy hash  t: terminal  c: code"
-	} else if mode == 2 {
+	} else if mode == 3 {
 		hints = "  tab: pane  q/esc: quit  ↑/↓ select  enter: diff"
 		if destructive {
 			hints += "  " + dirtyRedStyle.Render("d: drop")
 		} else {
 			hints += "  D: destructive mode"
 		}
-	} else {
+	} else if mode == 2 {
 		keys := "  |  tab: pane  q/esc: quit"
 		if activePane == 1 {
 			keys += "  t: terminal  c: code"
@@ -227,6 +228,8 @@ func RenderStatusBar(width, mode, overlay, activePane int, destructive, staleSel
 			keys += "  D: destructive mode"
 		}
 		hints = " " + cleanStyle.Render("✔") + " clean  " + aheadBehindStyle.Render("●") + " ahead/behind  " + dirtyRedStyle.Render("●") + " dirty  " + noUpstreamStyle.Render("●") + " no upstream" + keys
+	} else {
+		hints = "  tab: pane  q/esc: quit"
 	}
 
 	return statusStyle.Width(width).Render(hints)
