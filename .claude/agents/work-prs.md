@@ -118,9 +118,9 @@ After processing all qualifying PRs, output a summary table:
 
 ```
 PR     Title                          Action Taken
-#12    Add user auth                  Fixed 2 test failures, fixed nil deref in handler
-#15    Refactor config                No issues found
-#18    Add webhook retry              Fixed missing error check in retry loop
+#12    Add reflog mode                Fixed 2 test failures, fixed nil deref in handler
+#15    Refactor model handlers        No issues found
+#18    Add stash drop action          Fixed missing error check in drop flow
 ```
 
 ## Rules
