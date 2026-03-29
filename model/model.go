@@ -950,7 +950,7 @@ func (m Model) ensureRepoVisible() Model {
 }
 
 func (m Model) ensureWorktreeVisible() Model {
-	contentHeight := m.height - ui.BranchContentOverhead
+	contentHeight := m.height - ui.WorktreeContentOverhead
 	if contentHeight <= 0 {
 		contentHeight = 16
 	}

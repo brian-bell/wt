@@ -22,6 +22,11 @@ const RepoContentOverhead = 3
 // this constant so they stay in sync.
 const BranchContentOverhead = 5
 
+// WorktreeContentOverhead is the number of rows consumed by chrome around the
+// worktree list. Currently identical to BranchContentOverhead (both share the
+// right-pane chrome: status bar + borders + mode header).
+const WorktreeContentOverhead = BranchContentOverhead
+
 // StashContentOverhead is the number of rows consumed by chrome around the
 // stash list. Currently identical to BranchContentOverhead (both share the
 // right-pane chrome: status bar + borders + mode header).
