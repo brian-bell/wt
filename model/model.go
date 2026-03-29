@@ -417,77 +417,85 @@ func (m Model) handleRightPaneKey(key string) (tea.Model, tea.Cmd) {
 // --- Cursor navigation ---
 
 func (m Model) handleCursorUp() (tea.Model, tea.Cmd) {
-	if m.mode == ModeWorktrees && len(m.worktrees) > 0 {
-		if m.worktreeSelected > 0 {
-			m.worktreeSelected--
-		} else {
-			m.worktreeSelected = len(m.worktrees) - 1
+	switch m.mode {
+	case ModeWorktrees:
+		if len(m.worktrees) > 0 {
+			if m.worktreeSelected > 0 {
+				m.worktreeSelected--
+			} else {
+				m.worktreeSelected = len(m.worktrees) - 1
+			}
+			m = m.ensureWorktreeVisible()
 		}
-		m = m.ensureWorktreeVisible()
-		return m, nil
-	}
-	if m.mode == ModeBranches && len(m.rows) > 0 {
-		if m.branchSelected > 0 {
-			m.branchSelected--
-		} else {
-			m.branchSelected = len(m.rows) - 1
+	case ModeBranches:
+		if len(m.rows) > 0 {
+			if m.branchSelected > 0 {
+				m.branchSelected--
+			} else {
+				m.branchSelected = len(m.rows) - 1
+			}
+			m = m.ensureBranchVisible()
 		}
-		m = m.ensureBranchVisible()
-		return m, nil
-	}
-	if m.mode == ModeStashes && len(m.stashes) > 0 {
-		if m.stashSelected > 0 {
-			m.stashSelected--
-		} else {
-			m.stashSelected = len(m.stashes) - 1
+	case ModeStashes:
+		if len(m.stashes) > 0 {
+			if m.stashSelected > 0 {
+				m.stashSelected--
+			} else {
+				m.stashSelected = len(m.stashes) - 1
+			}
+			m = m.ensureStashVisible()
 		}
-		m = m.ensureStashVisible()
-	}
-	if m.mode == ModeHistory && len(m.commits) > 0 {
-		if m.commitSelected > 0 {
-			m.commitSelected--
-		} else {
-			m.commitSelected = len(m.commits) - 1
+	case ModeHistory:
+		if len(m.commits) > 0 {
+			if m.commitSelected > 0 {
+				m.commitSelected--
+			} else {
+				m.commitSelected = len(m.commits) - 1
+			}
+			m = m.ensureCommitVisible()
 		}
-		m = m.ensureCommitVisible()
 	}
 	return m, nil
 }
 
 func (m Model) handleCursorDown() (tea.Model, tea.Cmd) {
-	if m.mode == ModeWorktrees && len(m.worktrees) > 0 {
-		if m.worktreeSelected < len(m.worktrees)-1 {
-			m.worktreeSelected++
-		} else {
-			m.worktreeSelected = 0
+	switch m.mode {
+	case ModeWorktrees:
+		if len(m.worktrees) > 0 {
+			if m.worktreeSelected < len(m.worktrees)-1 {
+				m.worktreeSelected++
+			} else {
+				m.worktreeSelected = 0
+			}
+			m = m.ensureWorktreeVisible()
 		}
-		m = m.ensureWorktreeVisible()
-		return m, nil
-	}
-	if m.mode == ModeBranches && len(m.rows) > 0 {
-		if m.branchSelected < len(m.rows)-1 {
-			m.branchSelected++
-		} else {
-			m.branchSelected = 0
+	case ModeBranches:
+		if len(m.rows) > 0 {
+			if m.branchSelected < len(m.rows)-1 {
+				m.branchSelected++
+			} else {
+				m.branchSelected = 0
+			}
+			m = m.ensureBranchVisible()
 		}
-		m = m.ensureBranchVisible()
-		return m, nil
-	}
-	if m.mode == ModeStashes && len(m.stashes) > 0 {
-		if m.stashSelected < len(m.stashes)-1 {
-			m.stashSelected++
-		} else {
-			m.stashSelected = 0
+	case ModeStashes:
+		if len(m.stashes) > 0 {
+			if m.stashSelected < len(m.stashes)-1 {
+				m.stashSelected++
+			} else {
+				m.stashSelected = 0
+			}
+			m = m.ensureStashVisible()
 		}
-		m = m.ensureStashVisible()
-	}
-	if m.mode == ModeHistory && len(m.commits) > 0 {
-		if m.commitSelected < len(m.commits)-1 {
-			m.commitSelected++
-		} else {
-			m.commitSelected = 0
+	case ModeHistory:
+		if len(m.commits) > 0 {
+			if m.commitSelected < len(m.commits)-1 {
+				m.commitSelected++
+			} else {
+				m.commitSelected = 0
+			}
+			m = m.ensureCommitVisible()
 		}
-		m = m.ensureCommitVisible()
 	}
 	return m, nil
 }
@@ -537,53 +545,43 @@ func (m Model) handleDelete() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleOpenTerminal() (tea.Model, tea.Cmd) {
+func (m Model) openAtPath(action func(string) error) (tea.Model, tea.Cmd) {
 	if m.mode == ModeWorktrees {
 		if wt, ok := m.selectedWorktree(); ok && !wt.Stale {
 			path := wt.Path
-			return m, func() tea.Msg { _ = actions.OpenTerminal(path); return nil }
+			return m, func() tea.Msg { _ = action(path); return nil }
 		}
 		return m, nil
 	}
 	if m.mode == ModeHistory && len(m.repos) > 0 {
 		path := m.repos[m.selected].Path
-		return m, func() tea.Msg { _ = actions.OpenTerminal(path); return nil }
+		return m, func() tea.Msg { _ = action(path); return nil }
 	}
 	if m.mode == ModeBranches && len(m.repos) > 0 {
 		if row, ok := m.selectedRow(); ok && row.WorktreePath != "" {
 			path := row.WorktreePath
-			return m, func() tea.Msg { _ = actions.OpenTerminal(path); return nil }
+			return m, func() tea.Msg { _ = action(path); return nil }
 		}
 	}
 	return m, nil
 }
 
+func (m Model) handleOpenTerminal() (tea.Model, tea.Cmd) {
+	return m.openAtPath(actions.OpenTerminal)
+}
+
 func (m Model) handleOpenCode() (tea.Model, tea.Cmd) {
-	if m.mode == ModeWorktrees {
-		if wt, ok := m.selectedWorktree(); ok && !wt.Stale {
-			path := wt.Path
-			return m, func() tea.Msg { _ = actions.OpenVSCode(path); return nil }
-		}
-		return m, nil
-	}
-	if m.mode == ModeHistory && len(m.repos) > 0 {
-		path := m.repos[m.selected].Path
-		return m, func() tea.Msg { _ = actions.OpenVSCode(path); return nil }
-	}
-	if m.mode == ModeBranches && len(m.repos) > 0 {
-		if row, ok := m.selectedRow(); ok && row.WorktreePath != "" {
-			path := row.WorktreePath
-			return m, func() tea.Msg { _ = actions.OpenVSCode(path); return nil }
-		}
-	}
-	return m, nil
+	return m.openAtPath(actions.OpenVSCode)
 }
 
 // --- Confirm dialogs ---
 
 func (m Model) confirmStashDrop() (tea.Model, tea.Cmd) {
+	repoPath, ok := m.currentRepoPath()
+	if !ok {
+		return m, nil
+	}
 	idx := m.stashes[m.stashSelected].Index
-	repoPath := m.repos[m.selected].Path
 	m.confirmPrompt = fmt.Sprintf("Drop stash@{%d}? (y/n)", idx)
 	m.confirmAction = func() tea.Cmd {
 		return func() tea.Msg {
@@ -600,7 +598,10 @@ func (m Model) confirmBranchDelete() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	repoPath := m.repos[m.selected].Path
+	repoPath, ok := m.currentRepoPath()
+	if !ok {
+		return m, nil
+	}
 
 	// Root branch cannot be deleted
 	if row.WorktreePath == repoPath {
@@ -637,7 +638,10 @@ func (m Model) confirmWorktreeDelete() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	repoPath := m.repos[m.selected].Path
+	repoPath, ok2 := m.currentRepoPath()
+	if !ok2 {
+		return m, nil
+	}
 	wtPath := wt.Path
 	branchName := wt.BranchName
 	if wt.Detached {
@@ -681,7 +685,10 @@ func (m Model) confirmWorktreePrune() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	repoPath := m.repos[m.selected].Path
+	repoPath, ok2 := m.currentRepoPath()
+	if !ok2 {
+		return m, nil
+	}
 	m.confirmPrompt = "Prune stale worktrees? (y/n)"
 	m.confirmAction = func() tea.Cmd {
 		return func() tea.Msg {
@@ -719,8 +726,16 @@ func (m Model) resetRightPaneCursors() Model {
 
 // --- Message handlers ---
 
+func (m Model) currentRepoPath() (string, bool) {
+	if len(m.repos) == 0 || m.selected >= len(m.repos) {
+		return "", false
+	}
+	return m.repos[m.selected].Path, true
+}
+
 func (m Model) isCurrentRepo(repoPath string) bool {
-	return m.selected < len(m.repos) && m.repos[m.selected].Path == repoPath
+	current, ok := m.currentRepoPath()
+	return ok && current == repoPath
 }
 
 func (m Model) handleWorktreeResult(msg WorktreeResultMsg) Model {
@@ -916,10 +931,10 @@ func (m Model) fetchForMode() tea.Cmd {
 }
 
 func (m Model) fetchWorktrees() tea.Cmd {
-	if len(m.repos) == 0 {
+	repoPath, ok := m.currentRepoPath()
+	if !ok {
 		return nil
 	}
-	repoPath := m.repos[m.selected].Path
 	return func() tea.Msg {
 		worktrees, _ := gitquery.ListWorktrees(repoPath)
 		return WorktreeResultMsg{RepoPath: repoPath, Worktrees: worktrees}
@@ -927,10 +942,10 @@ func (m Model) fetchWorktrees() tea.Cmd {
 }
 
 func (m Model) fetchBranches() tea.Cmd {
-	if len(m.repos) == 0 {
+	repoPath, ok := m.currentRepoPath()
+	if !ok {
 		return nil
 	}
-	repoPath := m.repos[m.selected].Path
 	return func() tea.Msg {
 		branches, _ := gitquery.ListBranches(repoPath)
 		return BranchResultMsg{RepoPath: repoPath, Branches: branches}
@@ -938,10 +953,10 @@ func (m Model) fetchBranches() tea.Cmd {
 }
 
 func (m Model) fetchStashes() tea.Cmd {
-	if len(m.repos) == 0 {
+	repoPath, ok := m.currentRepoPath()
+	if !ok {
 		return nil
 	}
-	repoPath := m.repos[m.selected].Path
 	return func() tea.Msg {
 		stashes, _ := gitquery.ListStashes(repoPath)
 		return StashResultMsg{RepoPath: repoPath, Stashes: stashes}
@@ -949,15 +964,14 @@ func (m Model) fetchStashes() tea.Cmd {
 }
 
 func (m Model) fetchBranchDiff() tea.Cmd {
-	if len(m.repos) == 0 {
+	repoPath, ok := m.currentRepoPath()
+	if !ok {
 		return nil
 	}
 	row, ok := m.selectedRow()
 	if !ok || !row.Branch.Dirty || !row.Branch.IsWorktree {
 		return nil
 	}
-
-	repoPath := m.repos[m.selected].Path
 	worktreePath := row.WorktreePath
 	if worktreePath == "" {
 		worktreePath = repoPath
@@ -975,14 +989,14 @@ func (m Model) fetchBranchDiff() tea.Cmd {
 }
 
 func (m Model) fetchWorktreeDiff() tea.Cmd {
-	if len(m.repos) == 0 {
+	repoPath, ok := m.currentRepoPath()
+	if !ok {
 		return nil
 	}
 	wt, ok := m.selectedWorktree()
 	if !ok || !wt.Dirty || wt.Stale {
 		return nil
 	}
-	repoPath := m.repos[m.selected].Path
 	worktreePath := wt.Path
 	return func() tea.Msg {
 		diff, _ := gitquery.BranchDiff(worktreePath)
@@ -995,10 +1009,10 @@ func (m Model) fetchWorktreeDiff() tea.Cmd {
 }
 
 func (m Model) fetchStashDiff() tea.Cmd {
-	if len(m.repos) == 0 || len(m.stashes) == 0 {
+	repoPath, ok := m.currentRepoPath()
+	if !ok || len(m.stashes) == 0 {
 		return nil
 	}
-	repoPath := m.repos[m.selected].Path
 	index := m.stashes[m.stashSelected].Index
 	return func() tea.Msg {
 		diff, _ := gitquery.StashDiff(repoPath, index)
@@ -1007,10 +1021,10 @@ func (m Model) fetchStashDiff() tea.Cmd {
 }
 
 func (m Model) fetchCommits() tea.Cmd {
-	if len(m.repos) == 0 {
+	repoPath, ok := m.currentRepoPath()
+	if !ok {
 		return nil
 	}
-	repoPath := m.repos[m.selected].Path
 	return func() tea.Msg {
 		commits, _ := gitquery.ListCommits(repoPath)
 		return CommitResultMsg{RepoPath: repoPath, Commits: commits}
@@ -1018,10 +1032,10 @@ func (m Model) fetchCommits() tea.Cmd {
 }
 
 func (m Model) fetchCommitDiff() tea.Cmd {
-	if len(m.repos) == 0 || len(m.commits) == 0 {
+	repoPath, ok := m.currentRepoPath()
+	if !ok || len(m.commits) == 0 {
 		return nil
 	}
-	repoPath := m.repos[m.selected].Path
 	hash := m.commits[m.commitSelected].Hash
 	return func() tea.Msg {
 		diff, _ := gitquery.CommitDiff(repoPath, hash)
