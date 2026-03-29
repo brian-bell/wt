@@ -307,7 +307,7 @@ func renderBranchPaneSelected(rows []gitquery.BranchRow, selected, scroll, width
 		var locationLabel string
 		if row.WorktreePath != "" {
 			if repoPath != "" && row.WorktreePath == repoPath {
-				locationLabel = " " + commitStyle.Render("[root]")
+				locationLabel = " " + rootStyle.Render("[root]")
 			} else {
 				locationLabel = " " + commitStyle.Render(fmt.Sprintf("[%s]", row.WorktreePath))
 			}

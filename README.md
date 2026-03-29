@@ -49,7 +49,7 @@ The UI has two panes: repos on the left, content on the right. `tab` switches fo
 | `1`/`2`/`3`/`4` | Switch to worktrees / branches / stashes / history |
 | `←`/`h`/`→`/`l` | Cycle through modes |
 | `enter` | View diff (dirty branch, stash, or commit) |
-| `d` | Delete branch/worktree or drop stash — requires destructive mode |
+| `d` | Delete branch or drop stash — requires destructive mode |
 | `p` | Prune stale worktree — requires destructive mode (branches view) |
 | `t` | Open terminal at worktree path |
 | `c` | Open VSCode at worktree path |
@@ -72,14 +72,16 @@ Each row shows the branch name (or `(detached)` for detached HEAD), status indic
 
 ### Branches view (mode 2)
 
-Shows all local branches alphabetically with stacking indicators:
+Shows non-worktree branches and the root branch. Worktree branches are managed in the worktrees view (mode 1) and are hidden here to avoid duplication. The root branch (checked out at the repo root) is pinned to position 0 with a blue `[root]` annotation and cannot be deleted.
+
+Status indicators stack on each branch:
 
 - `✔` green: even with upstream, clean working tree
 - `●` yellow: ahead/behind upstream — shows `+N/-N` counts
 - `●` red: dirty worktree — shows `N files +X/-Y` (lines added/deleted)
 - `●` purple: no upstream or upstream gone
 
-Worktree branches are annotated with `[root]` (repo root) or `[<path>]` (additional worktrees). Multi-checkout branches expand to one row per worktree. Detached worktrees appear as `(detached)` rows with their path annotation. Branches ahead of upstream show up to 5 unpushed commit messages, with overflow count. When a branch is dirty and is a worktree, `enter` opens a full-screen diff overlay. `t`/`c` open a terminal or VSCode at the worktree path. `d` removes the worktree (or deletes the branch for non-worktree branches), with a force-retry prompt on failure. `p` prunes stale worktree references. Deletion requires destructive mode to be enabled first (`D`).
+Branches ahead of upstream show up to 5 unpushed commit messages, with overflow count. When the root branch is dirty, `enter` opens a full-screen diff overlay. `t`/`c` open a terminal or VSCode at the worktree path (root branch only). `d` deletes non-worktree branches, with a force-retry prompt on failure. Deletion requires destructive mode to be enabled first (`D`).
 
 ### Stashes view (mode 3)
 

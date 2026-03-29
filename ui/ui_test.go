@@ -429,6 +429,18 @@ func TestBranchPane_StaleWorktreeShowsStaleIndicator(t *testing.T) {
 	}
 }
 
+func TestBranchPane_RootAnnotationUsesBlueStyle(t *testing.T) {
+	rows := []gitquery.BranchRow{
+		{Branch: gitquery.Branch{Name: "main", HasUpstream: true, IsWorktree: true}, WorktreePath: "/dev/alpha"},
+	}
+	lines := renderBranchPaneSelected(rows, 0, 0, 80, 10, "/dev/alpha")
+	joined := strings.Join(lines, "\n")
+	blueRoot := rootStyle.Render("[root]")
+	if !strings.Contains(joined, blueRoot) {
+		t.Error("root label in branch pane should use blue rootStyle")
+	}
+}
+
 func TestBranchPane_NonWorktreeNoAnnotation(t *testing.T) {
 	rows := []gitquery.BranchRow{
 		{Branch: gitquery.Branch{Name: "feat", HasUpstream: true, IsWorktree: false}},

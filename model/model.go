@@ -587,6 +587,11 @@ func (m Model) confirmBranchDelete() (tea.Model, tea.Cmd) {
 	}
 	repoPath := m.repos[m.selected].Path
 
+	// Root branch cannot be deleted
+	if row.WorktreePath == repoPath {
+		return m, nil
+	}
+
 	if row.WorktreePath != "" {
 		worktreePath := row.WorktreePath
 		branchName := row.Branch.Name
@@ -674,7 +679,26 @@ func (m Model) handleWorktreeResult(msg WorktreeResultMsg) Model {
 
 func (m Model) handleBranchResult(msg BranchResultMsg) Model {
 	if m.isCurrentRepo(msg.RepoPath) {
-		m.rows = gitquery.FlattenBranches(msg.Branches)
+		allRows := gitquery.FlattenBranches(msg.Branches)
+		var filtered []gitquery.BranchRow
+		for _, row := range allRows {
+			if row.Branch.IsWorktree && row.WorktreePath != msg.RepoPath {
+				continue
+			}
+			filtered = append(filtered, row)
+		}
+		// Pin root worktree to position 0
+		for i, row := range filtered {
+			if row.WorktreePath == msg.RepoPath {
+				if i != 0 {
+					root := filtered[i]
+					copy(filtered[1:i+1], filtered[:i])
+					filtered[0] = root
+				}
+				break
+			}
+		}
+		m.rows = filtered
 		if len(m.rows) == 0 || m.branchSelected >= len(m.rows) {
 			m.branchSelected = 0
 		}
