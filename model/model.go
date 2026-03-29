@@ -15,7 +15,8 @@ import (
 type Mode int
 
 const (
-	ModeBranches Mode = iota + 1
+	ModeWorktrees Mode = iota + 1
+	ModeBranches
 	ModeStashes
 	ModeHistory
 )
@@ -121,7 +122,7 @@ type Model struct {
 
 // New creates a Model from discovered repos.
 func New(repos []scanner.Repo) Model {
-	return Model{repos: repos, mode: ModeBranches}
+	return Model{repos: repos, mode: ModeWorktrees}
 }
 
 func (m Model) Selected() int              { return m.selected }
@@ -147,7 +148,7 @@ func (m Model) ActivePane() int            { return m.activePane }
 func (m Model) Destructive() bool          { return m.destructive }
 
 func (m Model) Init() tea.Cmd {
-	return m.fetchBranches()
+	return m.fetchForMode()
 }
 
 func (m Model) View() string {
@@ -310,7 +311,7 @@ func (m Model) handleRightPaneKey(key string) (tea.Model, tea.Cmd) {
 	case "down", "j":
 		return m.handleCursorDown()
 	case "left", "h":
-		if m.mode > ModeBranches {
+		if m.mode > ModeWorktrees {
 			m.mode--
 			m.branchSelected = 0
 			m.stashSelected = 0
@@ -328,14 +329,24 @@ func (m Model) handleRightPaneKey(key string) (tea.Model, tea.Cmd) {
 			return m, m.fetchForMode()
 		}
 	case "1":
+		if m.mode != ModeWorktrees {
+			m.mode = ModeWorktrees
+			m.branchSelected = 0
+			m.stashSelected = 0
+			m.commitSelected = 0
+			m.commitScroll = 0
+			return m, nil
+		}
+	case "2":
 		if m.mode != ModeBranches {
 			m.mode = ModeBranches
 			m.branchSelected = 0
+			m.stashSelected = 0
 			m.commitSelected = 0
 			m.commitScroll = 0
 			return m, m.fetchBranches()
 		}
-	case "2":
+	case "3":
 		if m.mode != ModeStashes {
 			m.mode = ModeStashes
 			m.branchSelected = 0
@@ -344,7 +355,7 @@ func (m Model) handleRightPaneKey(key string) (tea.Model, tea.Cmd) {
 			m.commitScroll = 0
 			return m, m.fetchStashes()
 		}
-	case "3":
+	case "4":
 		if m.mode != ModeHistory {
 			m.mode = ModeHistory
 			m.commitSelected = 0
@@ -728,6 +739,8 @@ func (m Model) handleCopyHash() (tea.Model, tea.Cmd) {
 
 func (m Model) fetchForMode() tea.Cmd {
 	switch m.mode {
+	case ModeWorktrees:
+		return nil
 	case ModeBranches:
 		return m.fetchBranches()
 	case ModeStashes:

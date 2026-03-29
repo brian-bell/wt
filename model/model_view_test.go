@@ -13,6 +13,7 @@ import (
 func TestModel_ViewShowsBranchData(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = inBranchesMode(m)
 	branches := []gitquery.Branch{
 		{Name: "main", HasUpstream: true},
 		{Name: "feature/auth", HasUpstream: true, Ahead: 2, Behind: 1,
@@ -51,56 +52,85 @@ func TestModel_ViewContainsExpectedContent(t *testing.T) {
 	}
 }
 
-func TestModel_ViewMode2ShowsPlaceholder(t *testing.T) {
+func TestModel_ViewWorktreesModeShowsPlaceholder(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
-	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	// Load branch data — worktrees mode should still show placeholder, not branches
+	branches := []gitquery.Branch{{Name: "main", HasUpstream: true}}
+	m, _ = update(m, model.BranchResultMsg{RepoPath: "/dev/alpha", Branches: branches})
 
 	view := m.View()
 	if !strings.Contains(view, "nothing here yet") {
-		t.Error("mode 2 should show placeholder")
+		t.Error("ModeWorktrees should show placeholder even when branch data is loaded")
+	}
+	if strings.Contains(view, "main") {
+		t.Error("ModeWorktrees should NOT show branch data")
 	}
 }
 
-func TestModel_ViewModeHeaderShowsThreeModes(t *testing.T) {
+func TestModel_ViewStashesModeShowsPlaceholder(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = inRightPane(m)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+
+	view := m.View()
+	if !strings.Contains(view, "nothing here yet") {
+		t.Error("ModeStashes with no data should show placeholder")
+	}
+}
+
+func TestModel_ViewModeHeaderShowsFourModes(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
 
 	view := m.View()
-	// Mode 1 active — mode header in right pane
-	if !strings.Contains(view, "[1] branches") {
-		t.Error("mode 1 active: right pane header should contain '[1] branches'")
+	// Mode 1 (worktrees) active
+	if !strings.Contains(view, "[1] worktrees") {
+		t.Error("mode 1 active: right pane header should contain '[1] worktrees'")
 	}
-	if !strings.Contains(view, "2 stashes") {
-		t.Error("mode 1 active: right pane header should show inactive '2 stashes'")
+	if !strings.Contains(view, "2 branches") {
+		t.Error("mode 1 active: right pane header should show inactive '2 branches'")
 	}
-	if !strings.Contains(view, "3 history") {
-		t.Error("mode 1 active: right pane header should show inactive '3 history'")
+	if !strings.Contains(view, "3 stashes") {
+		t.Error("mode 1 active: right pane header should show inactive '3 stashes'")
+	}
+	if !strings.Contains(view, "4 history") {
+		t.Error("mode 1 active: right pane header should show inactive '4 history'")
 	}
 
-	// Switch to mode 2
+	// Switch to mode 2 (branches)
 	m = inRightPane(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
 	view = m.View()
-	if !strings.Contains(view, "[2] stashes") {
-		t.Error("mode 2 active: right pane header should contain '[2] stashes'")
+	if !strings.Contains(view, "[2] branches") {
+		t.Error("mode 2 active: right pane header should contain '[2] branches'")
 	}
-	if !strings.Contains(view, "1 branches") {
-		t.Error("mode 2 active: right pane header should show inactive '1 branches'")
+	if !strings.Contains(view, "1 worktrees") {
+		t.Error("mode 2 active: right pane header should show inactive '1 worktrees'")
 	}
 
-	// Switch to mode 3
+	// Switch to mode 3 (stashes)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
 	view = m.View()
-	if !strings.Contains(view, "[3] history") {
-		t.Error("mode 3 active: right pane header should contain '[3] history'")
+	if !strings.Contains(view, "[3] stashes") {
+		t.Error("mode 3 active: right pane header should contain '[3] stashes'")
 	}
-	if !strings.Contains(view, "1 branches") {
-		t.Error("mode 3 active: right pane header should show inactive '1 branches'")
+
+	// Switch to mode 4 (history)
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})
+	view = m.View()
+	if !strings.Contains(view, "[4] history") {
+		t.Error("mode 4 active: right pane header should contain '[4] history'")
 	}
-	if !strings.Contains(view, "2 stashes") {
-		t.Error("mode 3 active: right pane header should show inactive '2 stashes'")
+	if !strings.Contains(view, "1 worktrees") {
+		t.Error("mode 4 active: right pane header should show inactive '1 worktrees'")
+	}
+	if !strings.Contains(view, "2 branches") {
+		t.Error("mode 4 active: right pane header should show inactive '2 branches'")
+	}
+	if !strings.Contains(view, "3 stashes") {
+		t.Error("mode 4 active: right pane header should show inactive '3 stashes'")
 	}
 }
 
@@ -114,11 +144,11 @@ func TestModel_ViewStatusBarShowsKeyHints(t *testing.T) {
 	}
 }
 
-func TestModel_ViewMode2ShowsStashContent(t *testing.T) {
+func TestModel_ViewStashesModeShowsStashContent(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 
 	view := m.View()
@@ -134,7 +164,7 @@ func TestModel_ViewOverlayShowsDiff(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
 	m, _ = update(m, model.StashResultMsg{RepoPath: "/dev/alpha", Stashes: testStashes()})
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyEnter})
 	m, _ = update(m, model.StashDiffResultMsg{RepoPath: "/dev/alpha", Index: 0, Diff: "diff --git a/f.txt\n--- a/f.txt\n+++ b/f.txt"})
@@ -148,31 +178,31 @@ func TestModel_ViewOverlayShowsDiff(t *testing.T) {
 	}
 }
 
-func TestModel_StatusBarMode2ShowsStashKeys(t *testing.T) {
+func TestModel_StatusBarStashesModeShowsStashKeys(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // mode 2
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}}) // stashes
 
 	view := m.View()
 	if !strings.Contains(view, "enter") {
-		t.Error("mode 2 status bar should mention 'enter'")
+		t.Error("stashes status bar should mention 'enter'")
 	}
 	if !strings.Contains(view, "↑/↓") {
-		t.Error("mode 2 status bar should mention '↑/↓'")
+		t.Error("stashes status bar should mention '↑/↓'")
 	}
 }
 
-func TestModel_StatusBarMode2ShowsDropHint(t *testing.T) {
+func TestModel_StatusBarStashesModeShowsDropHint(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
 	m = inRightPane(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}}) // enable destructive
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight})                     // mode 2
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}}) // stashes
 
 	view := m.View()
 	if !strings.Contains(view, "d: drop") {
-		t.Error("mode 2 status bar should mention 'd: drop' in destructive mode")
+		t.Error("stashes status bar should mention 'd: drop' in destructive mode")
 	}
 }
 
@@ -181,7 +211,7 @@ func TestModel_StatusBarMode2ShowsDropHint(t *testing.T) {
 func TestModel_ViewReadOnlyHidesDeleteHint(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
-	m = inRightPane(m)
+	m = inBranchesMode(m)
 
 	view := m.View()
 	if strings.Contains(view, "d: delete") {
@@ -193,7 +223,7 @@ func TestModel_ViewReadOnlyHidesDropHint(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRight}) // mode 2
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}}) // stashes
 
 	view := m.View()
 	if strings.Contains(view, "d: drop") {
@@ -204,6 +234,7 @@ func TestModel_ViewReadOnlyHidesDropHint(t *testing.T) {
 func TestModel_ViewReadOnlyShowsDestructiveModeHint(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
+	m = inBranchesMode(m)
 
 	view := m.View()
 	if !strings.Contains(view, "D: destructive mode") {
@@ -214,7 +245,7 @@ func TestModel_ViewReadOnlyShowsDestructiveModeHint(t *testing.T) {
 func TestModel_ViewDestructiveModeShowsDeleteHint(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
-	m = inRightPane(m)
+	m = inBranchesMode(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
 
 	view := m.View()
@@ -223,23 +254,23 @@ func TestModel_ViewDestructiveModeShowsDeleteHint(t *testing.T) {
 	}
 }
 
-func TestModel_ViewMode3ShowsPlaceholder(t *testing.T) {
+func TestModel_ViewHistoryModeShowsPlaceholder(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 
 	view := m.View()
 	if !strings.Contains(view, "nothing here yet") {
-		t.Error("mode 3 with no commits should show placeholder")
+		t.Error("history mode with no commits should show placeholder")
 	}
 }
 
-func TestModel_ViewMode3ShowsCommitContent(t *testing.T) {
+func TestModel_ViewHistoryModeShowsCommitContent(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m, _ = update(m, model.CommitResultMsg{RepoPath: "/dev/alpha", Commits: testCommits()})
 
 	view := m.View()
@@ -251,11 +282,11 @@ func TestModel_ViewMode3ShowsCommitContent(t *testing.T) {
 	}
 }
 
-func TestModel_StatusBarMode3ShowsHistoryKeys(t *testing.T) {
+func TestModel_StatusBarHistoryModeShowsHistoryKeys(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
 	m = inRightPane(m)
-	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 
 	view := m.View()
 	if !strings.Contains(view, "enter: diff") {
@@ -275,6 +306,7 @@ func TestModel_StatusBarMode3ShowsHistoryKeys(t *testing.T) {
 func TestModel_ViewDestructiveModeHidesDestructiveHint(t *testing.T) {
 	m := model.New(testRepos())
 	m, _ = update(m, tea.WindowSizeMsg{Width: 120, Height: 24})
+	m = inBranchesMode(m)
 	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
 
 	view := m.View()

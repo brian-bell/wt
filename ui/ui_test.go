@@ -11,17 +11,17 @@ import (
 	"github.com/brian-bell/wtui/scanner"
 )
 
-func TestStatusBar_Mode1ContainsIndicatorLegend(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, 1, true, false)
+func TestStatusBar_BranchesModeContainsIndicatorLegend(t *testing.T) {
+	bar := RenderStatusBar(120, 2, 0, 1, true, false)
 	for _, legend := range []string{"✔ clean", "● ahead/behind", "● dirty", "● no upstream"} {
 		if !strings.Contains(bar, legend) {
-			t.Errorf("mode 1 status bar should contain legend %q", legend)
+			t.Errorf("branches mode status bar should contain legend %q", legend)
 		}
 	}
 }
 
 func TestStatusBar_IndicatorLegendSpacing(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, 1, true, false)
+	bar := RenderStatusBar(120, 2, 0, 1, true, false)
 	for _, pair := range [][2]string{
 		{"clean", "●"},
 	} {
@@ -38,15 +38,15 @@ func TestStatusBar_IndicatorLegendSpacing(t *testing.T) {
 	}
 }
 
-func TestStatusBar_Mode2OmitsIndicatorLegend(t *testing.T) {
-	bar := RenderStatusBar(120, 2, 0, 1, true, false)
+func TestStatusBar_StashesModeOmitsIndicatorLegend(t *testing.T) {
+	bar := RenderStatusBar(120, 3, 0, 1, true, false)
 	if strings.Contains(bar, "clean") {
-		t.Error("mode 2 status bar should not contain indicator legend")
+		t.Error("stashes mode status bar should not contain indicator legend")
 	}
 }
 
 func TestStatusBar_PipeSeparatesLegendAndHints(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, 1, true, false)
+	bar := RenderStatusBar(120, 2, 0, 1, true, false)
 	upstreamIdx := strings.Index(bar, "no upstream")
 	tabIdx := strings.Index(bar, "tab: pane")
 	if upstreamIdx == -1 || tabIdx == -1 {
@@ -59,7 +59,7 @@ func TestStatusBar_PipeSeparatesLegendAndHints(t *testing.T) {
 }
 
 func TestStatusBar_TabAndQuitBeforeOtherHints(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, 1, true, false)
+	bar := RenderStatusBar(120, 2, 0, 1, true, false)
 	tabIdx := strings.Index(bar, "tab: pane")
 	tIdx := strings.Index(bar, "t: terminal")
 	if tabIdx == -1 || tIdx == -1 {
@@ -75,7 +75,7 @@ func TestStatusBar_TabAndQuitBeforeOtherHints(t *testing.T) {
 }
 
 func TestStatusBar_ActionHintsHiddenWhenLeftPaneActive(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, 0, true, false) // activePane=0 (left), destructive=true
+	bar := RenderStatusBar(120, 2, 0, 0, true, false) // activePane=0 (left), destructive=true
 	for _, hint := range []string{"t: terminal", "c: code", "d: delete"} {
 		if strings.Contains(bar, hint) {
 			t.Errorf("hint %q should be hidden when left pane is active", hint)
@@ -90,7 +90,7 @@ func TestStatusBar_ActionHintsHiddenWhenLeftPaneActive(t *testing.T) {
 }
 
 func TestStatusBar_ActionHintsShownWhenRightPaneActive(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, 1, true, false) // activePane=1 (right)
+	bar := RenderStatusBar(120, 2, 0, 1, true, false) // activePane=1 (right)
 	for _, hint := range []string{"t: terminal", "c: code", "d: delete"} {
 		if !strings.Contains(bar, hint) {
 			t.Errorf("hint %q should be shown when right pane is active", hint)
@@ -99,7 +99,7 @@ func TestStatusBar_ActionHintsShownWhenRightPaneActive(t *testing.T) {
 }
 
 func TestStatusBar_KeyHintSpacingIs2(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, 1, true, false)
+	bar := RenderStatusBar(120, 2, 0, 1, true, false)
 	for _, pair := range [][2]string{
 		{"tab: pane", "q/esc: quit"},
 		{"t: terminal", "c: code"},
@@ -119,16 +119,16 @@ func TestStatusBar_KeyHintSpacingIs2(t *testing.T) {
 }
 
 func TestModeHeader_ShowsActiveMode(t *testing.T) {
-	header := renderModeHeader(1, 40)
-	if !strings.Contains(header, "[1] branches") {
+	header := renderModeHeader(1, 60)
+	if !strings.Contains(header, "[1] worktrees") {
 		t.Error("mode header should show active mode 1 bracketed")
 	}
 	if strings.Contains(header, "[2]") {
 		t.Error("inactive mode 2 should not be bracketed")
 	}
-	header = renderModeHeader(2, 40)
-	if !strings.Contains(header, "[2] stashes") {
-		t.Error("mode header should show active mode 2 bracketed")
+	header = renderModeHeader(3, 60)
+	if !strings.Contains(header, "[3] stashes") {
+		t.Error("mode header should show active mode 3 bracketed")
 	}
 }
 
@@ -153,8 +153,8 @@ func TestRender_ModeHeaderInRightPane(t *testing.T) {
 		Height:   10,
 		Mode:     1,
 	})
-	if !strings.Contains(view, "[1] branches") {
-		t.Error("render should contain mode header '[1] branches' in right pane")
+	if !strings.Contains(view, "[1] worktrees") {
+		t.Error("render should contain mode header '[1] worktrees' in right pane")
 	}
 }
 
@@ -447,7 +447,7 @@ func TestRender_HighlightsSelectedBranch(t *testing.T) {
 		Selected: 0,
 		Width:    80,
 		Height:   10,
-		Mode:     1,
+		Mode:     2,
 		Branches: []gitquery.BranchRow{
 			{Branch: gitquery.Branch{Name: "clean"}},
 			{Branch: gitquery.Branch{Name: "dirty", IsWorktree: true, Dirty: true}, WorktreePath: "/a"},
@@ -469,7 +469,7 @@ func TestRender_HighlightsSecondBranch(t *testing.T) {
 		Selected: 0,
 		Width:    80,
 		Height:   10,
-		Mode:     1,
+		Mode:     2,
 		Branches: []gitquery.BranchRow{
 			{Branch: gitquery.Branch{Name: "clean"}},
 			{Branch: gitquery.Branch{Name: "dirty", IsWorktree: true, Dirty: true}, WorktreePath: "/a"},
@@ -491,7 +491,7 @@ func TestRender_HidesCursorWhenLeftPaneActive(t *testing.T) {
 		Selected: 0,
 		Width:    80,
 		Height:   10,
-		Mode:     1,
+		Mode:     2,
 		Branches: []gitquery.BranchRow{
 			{Branch: gitquery.Branch{Name: "main"}},
 		},
@@ -630,28 +630,28 @@ func TestRender_ForceConfirmDialogShowsPrompt(t *testing.T) {
 }
 
 func TestStatusBar_PruneHintShownWhenStale(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, 1, true, true)
+	bar := RenderStatusBar(120, 2, 0, 1, true, true)
 	if !strings.Contains(bar, "p: prune") {
 		t.Errorf("expected 'p: prune' hint when stale worktree selected, got %q", bar)
 	}
 }
 
 func TestStatusBar_PruneHintHiddenWhenNotStale(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, 1, true, false)
+	bar := RenderStatusBar(120, 2, 0, 1, true, false)
 	if strings.Contains(bar, "p: prune") {
 		t.Error("'p: prune' should not appear when no stale worktree selected")
 	}
 }
 
 func TestStatusBar_PruneHintHiddenWithoutDestructive(t *testing.T) {
-	bar := RenderStatusBar(120, 1, 0, 1, false, true)
+	bar := RenderStatusBar(120, 2, 0, 1, false, true)
 	if strings.Contains(bar, "p: prune") {
 		t.Error("'p: prune' should not appear without destructive mode")
 	}
 }
 
-func TestStatusBar_Mode2HintsSpacing(t *testing.T) {
-	bar := RenderStatusBar(120, 2, 0, 1, true, false)
+func TestStatusBar_StashesModeHintsSpacing(t *testing.T) {
+	bar := RenderStatusBar(120, 3, 0, 1, true, false)
 	for _, pair := range [][2]string{
 		{"tab: pane", "q/esc: quit"},
 		{"↑/↓ select", "enter: diff"},
@@ -735,21 +735,24 @@ func TestBranchPane_NonWorktreeBranchShowsNoLabel(t *testing.T) {
 
 // --- History (mode 3) tests ---
 
-func TestModeHeader_ShowsThreeModes(t *testing.T) {
-	header := renderModeHeader(3, 60)
-	if !strings.Contains(header, "[3] history") {
-		t.Error("expected active '[3] history' in header")
+func TestModeHeader_ShowsFourModes(t *testing.T) {
+	header := renderModeHeader(4, 80)
+	if !strings.Contains(header, "[4] history") {
+		t.Error("expected active '[4] history' in header")
 	}
-	if !strings.Contains(header, "1 branches") {
-		t.Error("expected inactive '1 branches' in header")
+	if !strings.Contains(header, "1 worktrees") {
+		t.Error("expected inactive '1 worktrees' in header")
 	}
-	if !strings.Contains(header, "2 stashes") {
-		t.Error("expected inactive '2 stashes' in header")
+	if !strings.Contains(header, "2 branches") {
+		t.Error("expected inactive '2 branches' in header")
+	}
+	if !strings.Contains(header, "3 stashes") {
+		t.Error("expected inactive '3 stashes' in header")
 	}
 }
 
-func TestStatusBar_Mode3ShowsHistoryHints(t *testing.T) {
-	bar := RenderStatusBar(120, 3, 0, 1, false, false)
+func TestStatusBar_HistoryModeShowsHistoryHints(t *testing.T) {
+	bar := RenderStatusBar(120, 4, 0, 1, false, false)
 	for _, hint := range []string{"enter: diff", "y: copy hash", "t: terminal", "c: code"} {
 		if !strings.Contains(bar, hint) {
 			t.Errorf("mode 3 status bar should contain %q", hint)
@@ -757,8 +760,8 @@ func TestStatusBar_Mode3ShowsHistoryHints(t *testing.T) {
 	}
 }
 
-func TestStatusBar_Mode3OmitsDeleteHint(t *testing.T) {
-	bar := RenderStatusBar(120, 3, 0, 1, true, false)
+func TestStatusBar_HistoryModeOmitsDeleteHint(t *testing.T) {
+	bar := RenderStatusBar(120, 4, 0, 1, true, false)
 	if strings.Contains(bar, "d: delete") {
 		t.Error("mode 3 status bar should not contain 'd: delete'")
 	}
@@ -767,8 +770,8 @@ func TestStatusBar_Mode3OmitsDeleteHint(t *testing.T) {
 	}
 }
 
-func TestStatusBar_Mode3OmitsDestructiveHint(t *testing.T) {
-	bar := RenderStatusBar(120, 3, 0, 1, false, false)
+func TestStatusBar_HistoryModeOmitsDestructiveHint(t *testing.T) {
+	bar := RenderStatusBar(120, 4, 0, 1, false, false)
 	if strings.Contains(bar, "D: destructive mode") {
 		t.Error("mode 3 status bar should not contain 'D: destructive mode'")
 	}
