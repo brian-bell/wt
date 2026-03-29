@@ -78,11 +78,124 @@ func TestModel_DefaultModeIsWorktrees(t *testing.T) {
 	}
 }
 
-func TestModel_InitReturnsNilForWorktreesMode(t *testing.T) {
+func TestModel_InitFiresWorktreeFetch(t *testing.T) {
 	m := model.New(testRepos())
 	cmd := m.Init()
-	if cmd != nil {
-		t.Error("Init should return nil for ModeWorktrees (no data to fetch yet)")
+	if cmd == nil {
+		t.Fatal("expected fetchWorktrees cmd from Init, got nil")
+	}
+	msg := cmd()
+	if _, ok := msg.(model.WorktreeResultMsg); !ok {
+		t.Errorf("expected WorktreeResultMsg from Init, got %T", msg)
+	}
+}
+
+func TestModel_WorktreeResultUpdatesState(t *testing.T) {
+	m := model.New(testRepos())
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", BranchName: "main", IsMain: true},
+		{Path: "/dev/alpha-feat", BranchName: "feat"},
+	}
+	m, _ = update(m, model.WorktreeResultMsg{RepoPath: "/dev/alpha", Worktrees: wts})
+	if len(m.Worktrees()) != 2 {
+		t.Fatalf("expected 2 worktrees, got %d", len(m.Worktrees()))
+	}
+	if m.WorktreeSelected() != 0 {
+		t.Errorf("expected worktreeSelected 0, got %d", m.WorktreeSelected())
+	}
+}
+
+func TestModel_StaleWorktreeResultDiscarded(t *testing.T) {
+	m := model.New(testRepos())
+	m = selectBravo(m) // selected=bravo
+	wts := []gitquery.Worktree{{Path: "/dev/alpha", BranchName: "main"}}
+	m, _ = update(m, model.WorktreeResultMsg{RepoPath: "/dev/alpha", Worktrees: wts})
+	if len(m.Worktrees()) != 0 {
+		t.Errorf("expected stale worktree result discarded, got %d", len(m.Worktrees()))
+	}
+}
+
+func TestModel_WorktreeCursorWraps(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", BranchName: "main", IsMain: true},
+		{Path: "/dev/alpha-feat", BranchName: "feat"},
+		{Path: "/dev/alpha-fix", BranchName: "fix"},
+	}
+	m := model.New(testRepos())
+	m = inRightPane(m)
+	m, _ = update(m, model.WorktreeResultMsg{RepoPath: "/dev/alpha", Worktrees: wts})
+
+	// Wrap backward from 0 to last
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyUp})
+	if m.WorktreeSelected() != 2 {
+		t.Errorf("expected WorktreeSelected to wrap to 2, got %d", m.WorktreeSelected())
+	}
+	// Wrap forward from last to 0
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	if m.WorktreeSelected() != 0 {
+		t.Errorf("expected WorktreeSelected to wrap to 0, got %d", m.WorktreeSelected())
+	}
+}
+
+func TestModel_WorktreeScrollFollowsCursor(t *testing.T) {
+	wts := make([]gitquery.Worktree, 10)
+	for i := range wts {
+		wts[i] = gitquery.Worktree{Path: fmt.Sprintf("/dev/wt-%d", i), BranchName: fmt.Sprintf("branch-%d", i)}
+	}
+	contentHeight := 3
+	m := model.New(testRepos())
+	m, _ = update(m, tea.WindowSizeMsg{Width: 80, Height: ui.BranchContentOverhead + contentHeight})
+	m = inRightPane(m)
+	m, _ = update(m, model.WorktreeResultMsg{RepoPath: "/dev/alpha", Worktrees: wts})
+
+	// Move cursor past viewport
+	for i := 0; i < 9; i++ {
+		m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if m.WorktreeSelected() != 9 {
+		t.Errorf("expected cursor at 9, got %d", m.WorktreeSelected())
+	}
+	if m.WorktreeScroll() == 0 {
+		t.Error("expected scroll to advance when cursor moves past viewport")
+	}
+	// Cursor must be within [scroll, scroll+contentHeight)
+	if m.WorktreeSelected() < m.WorktreeScroll() || m.WorktreeSelected() >= m.WorktreeScroll()+contentHeight {
+		t.Errorf("cursor %d not in scroll viewport [%d, %d)", m.WorktreeSelected(), m.WorktreeScroll(), m.WorktreeScroll()+contentHeight)
+	}
+}
+
+func TestModel_ModeSwitchResetsWorktreeCursors(t *testing.T) {
+	wts := []gitquery.Worktree{
+		{Path: "/dev/alpha", BranchName: "main"},
+		{Path: "/dev/alpha-feat", BranchName: "feat"},
+		{Path: "/dev/alpha-fix", BranchName: "fix"},
+	}
+	m := model.New(testRepos())
+	m = inRightPane(m)
+	m, _ = update(m, model.WorktreeResultMsg{RepoPath: "/dev/alpha", Worktrees: wts})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	if m.WorktreeSelected() != 2 {
+		t.Fatalf("expected WorktreeSelected 2, got %d", m.WorktreeSelected())
+	}
+	// Switch away and back
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
+	if m.WorktreeSelected() != 0 {
+		t.Errorf("expected WorktreeSelected reset to 0, got %d", m.WorktreeSelected())
+	}
+}
+
+func TestModel_SwitchToWorktreesModeFiresFetch(t *testing.T) {
+	m := model.New(testRepos())
+	m = inBranchesMode(m) // switch to mode 2
+	_, cmd := update(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
+	if cmd == nil {
+		t.Fatal("expected fetchWorktrees cmd on switch to mode 1, got nil")
+	}
+	msg := cmd()
+	if _, ok := msg.(model.WorktreeResultMsg); !ok {
+		t.Errorf("expected WorktreeResultMsg, got %T", msg)
 	}
 }
 
@@ -230,6 +343,20 @@ func TestModel_RepoSwitchClearsRightPaneData(t *testing.T) {
 	}
 	if len(m.Stashes()) != 0 {
 		t.Errorf("expected stashes cleared on repo switch, got %d", len(m.Stashes()))
+	}
+}
+
+func TestModel_RepoSwitchClearsWorktrees(t *testing.T) {
+	m := model.New(testRepos())
+	m, _ = update(m, model.WorktreeResultMsg{RepoPath: "/dev/alpha", Worktrees: []gitquery.Worktree{
+		{Path: "/dev/alpha", BranchName: "main", IsMain: true},
+	}})
+	if len(m.Worktrees()) != 1 {
+		t.Fatal("expected 1 worktree before switching repos")
+	}
+	m, _ = update(m, tea.KeyMsg{Type: tea.KeyDown})
+	if len(m.Worktrees()) != 0 {
+		t.Errorf("expected worktrees cleared on repo switch, got %d", len(m.Worktrees()))
 	}
 }
 

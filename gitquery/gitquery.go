@@ -24,6 +24,19 @@ type Commit struct {
 	Subject string
 }
 
+// Worktree represents a single git worktree checkout.
+type Worktree struct {
+	Path         string
+	BranchName   string
+	Detached     bool
+	Stale        bool
+	IsMain       bool
+	Dirty        bool
+	FilesChanged int
+	LinesAdded   int
+	LinesDeleted int
+}
+
 // Branch represents a local git branch with its status.
 type Branch struct {
 	Name          string
@@ -65,6 +78,75 @@ func FlattenBranches(branches []Branch) []BranchRow {
 		}
 	}
 	return rows
+}
+
+// ListWorktrees returns all worktrees for the given repo, with the main worktree first.
+func ListWorktrees(repoPath string) ([]Worktree, error) {
+	out, err := gitCmd(repoPath, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, err
+	}
+
+	var worktrees []Worktree
+	first := true
+	for _, block := range splitWorktreeBlocks(out) {
+		wt := parseWorktreeBlock(block)
+		if wt.isBare {
+			continue
+		}
+
+		w := Worktree{
+			Path:     wt.path,
+			Detached: wt.detached,
+			IsMain:   first,
+		}
+		if wt.detached {
+			w.BranchName = ""
+		} else {
+			w.BranchName = wt.branch
+		}
+		first = false
+
+		// Detect stale worktrees
+		stale := checkStale([]string{w.Path})
+		w.Stale = stale[0]
+
+		// Populate dirty status for non-stale worktrees
+		if !w.Stale {
+			populateWorktreeDirtyStatus(&w)
+		}
+
+		worktrees = append(worktrees, w)
+	}
+	return worktrees, nil
+}
+
+func populateWorktreeDirtyStatus(wt *Worktree) {
+	statusOut, err := gitCmd(wt.Path, "status", "--porcelain")
+	if err != nil {
+		return
+	}
+	statusLines := splitLines(statusOut)
+	if len(statusLines) == 0 {
+		return
+	}
+	wt.Dirty = true
+	wt.FilesChanged = len(statusLines)
+
+	diffOut, err := gitCmd(wt.Path, "diff", "HEAD", "--numstat")
+	if err != nil {
+		return
+	}
+	for _, line := range splitLines(diffOut) {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		added, _ := strconv.Atoi(fields[0])
+		deleted, _ := strconv.Atoi(fields[1])
+		wt.LinesAdded += added
+		wt.LinesDeleted += deleted
+	}
 }
 
 // ListCommits returns the most recent 50 commits for the given repo path.
