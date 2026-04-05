@@ -1,6 +1,9 @@
 package gitquery
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // ParseReflog parses the output of git reflog --format=%h%x00%gd%x00%ar%x00%gs.
 func ParseReflog(text string) []ReflogEntry {
@@ -23,6 +26,31 @@ func ParseReflog(text string) []ReflogEntry {
 		})
 	}
 	return entries
+}
+
+// ParseStashList parses the output of git stash list --format=%gd%x00%ai%x00%s.
+func ParseStashList(text string) []Stash {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+
+	var stashes []Stash
+	for _, line := range strings.Split(text, "\n") {
+		parts := strings.SplitN(line, "\x00", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		idxStr := strings.TrimPrefix(parts[0], "stash@{")
+		idxStr = strings.TrimSuffix(idxStr, "}")
+		idx, _ := strconv.Atoi(idxStr)
+		stashes = append(stashes, Stash{
+			Index:   idx,
+			Date:    parts[1],
+			Message: parts[2],
+		})
+	}
+	return stashes
 }
 
 // ParseCommitLog parses the output of git log --format=%h%x00%an%x00%ar%x00%s.

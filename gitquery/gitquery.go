@@ -208,29 +208,7 @@ func ListStashes(repoPath string) ([]Stash, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listing stashes: %w", err)
 	}
-
-	text = strings.TrimSpace(text)
-	if text == "" {
-		return nil, nil
-	}
-
-	var stashes []Stash
-	for _, line := range strings.Split(text, "\n") {
-		parts := strings.SplitN(line, "\x00", 3)
-		if len(parts) != 3 {
-			continue
-		}
-		// parts[0] is like "stash@{0}"
-		idxStr := strings.TrimPrefix(parts[0], "stash@{")
-		idxStr = strings.TrimSuffix(idxStr, "}")
-		idx, _ := strconv.Atoi(idxStr)
-		stashes = append(stashes, Stash{
-			Index:   idx,
-			Date:    parts[1],
-			Message: parts[2],
-		})
-	}
-	return stashes, nil
+	return ParseStashList(text), nil
 }
 
 // StashDiff returns the diff for a specific stash entry.
