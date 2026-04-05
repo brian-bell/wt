@@ -263,3 +263,82 @@ func TestParseBranchLine_NameOnly(t *testing.T) {
 		t.Error("expected HasUpstream = false")
 	}
 }
+
+func TestParseWorktreeList_ParsesMultipleWorktrees(t *testing.T) {
+	input := "worktree /home/user/project\nbranch refs/heads/main\n\nworktree /home/user/project-feature\nbranch refs/heads/feature\n\n"
+
+	infos := gitquery.ParseWorktreeList(input)
+
+	if len(infos) != 2 {
+		t.Fatalf("expected 2 worktrees, got %d", len(infos))
+	}
+	if infos[0].Path != "/home/user/project" {
+		t.Errorf("expected Path %q, got %q", "/home/user/project", infos[0].Path)
+	}
+	if infos[0].Branch != "main" {
+		t.Errorf("expected Branch %q, got %q", "main", infos[0].Branch)
+	}
+	if infos[0].IsBare || infos[0].Detached {
+		t.Error("expected IsBare=false, Detached=false")
+	}
+	if infos[1].Path != "/home/user/project-feature" {
+		t.Errorf("expected Path %q, got %q", "/home/user/project-feature", infos[1].Path)
+	}
+	if infos[1].Branch != "feature" {
+		t.Errorf("expected Branch %q, got %q", "feature", infos[1].Branch)
+	}
+}
+
+func TestParseWorktreeList_BareWorktree(t *testing.T) {
+	input := "worktree /home/user/project.git\nbare\n\n"
+
+	infos := gitquery.ParseWorktreeList(input)
+
+	if len(infos) != 1 {
+		t.Fatalf("expected 1 worktree, got %d", len(infos))
+	}
+	if !infos[0].IsBare {
+		t.Error("expected IsBare = true")
+	}
+}
+
+func TestParseWorktreeList_DetachedWorktree(t *testing.T) {
+	input := "worktree /home/user/project-detached\ndetached\n\n"
+
+	infos := gitquery.ParseWorktreeList(input)
+
+	if len(infos) != 1 {
+		t.Fatalf("expected 1 worktree, got %d", len(infos))
+	}
+	if !infos[0].Detached {
+		t.Error("expected Detached = true")
+	}
+	if infos[0].Branch != "(detached)" {
+		t.Errorf("expected Branch %q, got %q", "(detached)", infos[0].Branch)
+	}
+}
+
+func TestParseWorktreeList_EmptyInput(t *testing.T) {
+	if infos := gitquery.ParseWorktreeList(""); infos != nil {
+		t.Errorf("expected nil, got %v", infos)
+	}
+}
+
+func TestParseWorktreeList_MixedTypes(t *testing.T) {
+	input := "worktree /home/user/repo.git\nbare\n\nworktree /home/user/repo\nbranch refs/heads/main\n\nworktree /home/user/repo-detached\ndetached\n\n"
+
+	infos := gitquery.ParseWorktreeList(input)
+
+	if len(infos) != 3 {
+		t.Fatalf("expected 3 worktrees, got %d", len(infos))
+	}
+	if !infos[0].IsBare {
+		t.Error("expected first to be bare")
+	}
+	if infos[1].Branch != "main" {
+		t.Errorf("expected second branch %q, got %q", "main", infos[1].Branch)
+	}
+	if !infos[2].Detached {
+		t.Error("expected third to be detached")
+	}
+}

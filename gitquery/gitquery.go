@@ -96,27 +96,25 @@ func ListWorktrees(repoPath string) ([]Worktree, error) {
 
 	var worktrees []Worktree
 	first := true
-	for _, block := range splitWorktreeBlocks(out) {
-		wt := parseWorktreeBlock(block)
-		if wt.isBare {
+	for _, wt := range ParseWorktreeList(out) {
+		if wt.IsBare {
 			continue
 		}
 
 		w := Worktree{
-			Path:     wt.path,
-			Detached: wt.detached,
+			Path:     wt.Path,
+			Detached: wt.Detached,
 			IsMain:   first,
 		}
-		if wt.detached {
+		if wt.Detached {
 			w.BranchName = ""
 		} else {
-			w.BranchName = wt.branch
+			w.BranchName = wt.Branch
 		}
 		first = false
 		worktrees = append(worktrees, w)
 	}
 
-	// Batch stale detection for all worktrees
 	paths := make([]string, len(worktrees))
 	for i := range worktrees {
 		paths[i] = worktrees[i].Path
@@ -280,51 +278,6 @@ func BranchDiff(worktreePath string) (string, error) {
 	return gitCmd(worktreePath, "diff", "HEAD")
 }
 
-// worktreeInfo is internal data parsed from git worktree list output.
-type worktreeInfo struct {
-	path     string
-	branch   string
-	isBare   bool
-	detached bool
-}
-
-func splitWorktreeBlocks(output string) []string {
-	var blocks []string
-	var current []string
-	for _, line := range strings.Split(strings.TrimRight(output, "\n"), "\n") {
-		if line == "" {
-			if len(current) > 0 {
-				blocks = append(blocks, strings.Join(current, "\n"))
-				current = nil
-			}
-			continue
-		}
-		current = append(current, line)
-	}
-	if len(current) > 0 {
-		blocks = append(blocks, strings.Join(current, "\n"))
-	}
-	return blocks
-}
-
-func parseWorktreeBlock(block string) worktreeInfo {
-	var wt worktreeInfo
-	for _, line := range strings.Split(block, "\n") {
-		switch {
-		case strings.HasPrefix(line, "worktree "):
-			wt.path = strings.TrimPrefix(line, "worktree ")
-		case strings.HasPrefix(line, "branch refs/heads/"):
-			wt.branch = strings.TrimPrefix(line, "branch refs/heads/")
-		case line == "bare":
-			wt.isBare = true
-		case line == "detached":
-			wt.detached = true
-			wt.branch = "(detached)"
-		}
-	}
-	return wt
-}
-
 // branchWorktreeMap returns a map of branch name -> worktree paths and detached worktree paths.
 func branchWorktreeMap(repoPath string) (map[string][]string, []string, error) {
 	out, err := gitCmd(repoPath, "worktree", "list", "--porcelain")
@@ -334,17 +287,16 @@ func branchWorktreeMap(repoPath string) (map[string][]string, []string, error) {
 
 	m := make(map[string][]string)
 	var detachedPaths []string
-	for _, block := range splitWorktreeBlocks(out) {
-		wt := parseWorktreeBlock(block)
-		if wt.isBare {
+	for _, wt := range ParseWorktreeList(out) {
+		if wt.IsBare {
 			continue
 		}
-		if wt.detached {
-			detachedPaths = append(detachedPaths, wt.path)
+		if wt.Detached {
+			detachedPaths = append(detachedPaths, wt.Path)
 			continue
 		}
-		if wt.branch != "" {
-			m[wt.branch] = append(m[wt.branch], wt.path)
+		if wt.Branch != "" {
+			m[wt.Branch] = append(m[wt.Branch], wt.Path)
 		}
 	}
 	return m, detachedPaths, nil

@@ -99,6 +99,58 @@ func ParseNumstat(text string) (int, int) {
 	return added, deleted
 }
 
+// WorktreeInfo holds data parsed from one block of git worktree list --porcelain output.
+type WorktreeInfo struct {
+	Path     string
+	Branch   string
+	IsBare   bool
+	Detached bool
+}
+
+// ParseWorktreeList parses the full output of git worktree list --porcelain
+// into a slice of WorktreeInfo entries.
+func ParseWorktreeList(output string) []WorktreeInfo {
+	output = strings.TrimRight(output, "\n")
+	if strings.TrimSpace(output) == "" {
+		return nil
+	}
+
+	var result []WorktreeInfo
+	var current []string
+	for _, line := range strings.Split(output, "\n") {
+		if line == "" {
+			if len(current) > 0 {
+				result = append(result, parseOneWorktreeBlock(strings.Join(current, "\n")))
+				current = nil
+			}
+			continue
+		}
+		current = append(current, line)
+	}
+	if len(current) > 0 {
+		result = append(result, parseOneWorktreeBlock(strings.Join(current, "\n")))
+	}
+	return result
+}
+
+func parseOneWorktreeBlock(block string) WorktreeInfo {
+	var wt WorktreeInfo
+	for _, line := range strings.Split(block, "\n") {
+		switch {
+		case strings.HasPrefix(line, "worktree "):
+			wt.Path = strings.TrimPrefix(line, "worktree ")
+		case strings.HasPrefix(line, "branch refs/heads/"):
+			wt.Branch = strings.TrimPrefix(line, "branch refs/heads/")
+		case line == "bare":
+			wt.IsBare = true
+		case line == "detached":
+			wt.Detached = true
+			wt.Branch = "(detached)"
+		}
+	}
+	return wt
+}
+
 // ParseCommitLog parses the output of git log --format=%h%x00%an%x00%ar%x00%s.
 func ParseCommitLog(text string) []Commit {
 	text = strings.TrimSpace(text)
