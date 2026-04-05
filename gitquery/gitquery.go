@@ -231,7 +231,7 @@ func ListBranches(repoPath string) ([]Branch, error) {
 		if line == "" {
 			continue
 		}
-		b, upstream := parseBranchLine(line)
+		b, upstream := ParseBranchLine(line)
 
 		if b.HasUpstream && !b.UpstreamGone {
 			ahead, behind, err := branchAheadBehind(repoPath, b.Name, upstream)
@@ -348,22 +348,6 @@ func branchWorktreeMap(repoPath string) (map[string][]string, []string, error) {
 		}
 	}
 	return m, detachedPaths, nil
-}
-
-func parseBranchLine(line string) (Branch, string) {
-	parts := strings.SplitN(line, "\t", 3)
-	b := Branch{Name: parts[0]}
-
-	var upstream string
-	if len(parts) > 1 && parts[1] != "" {
-		b.HasUpstream = true
-		upstream = parts[1]
-		if len(parts) > 2 && strings.Contains(parts[2], "gone") {
-			b.UpstreamGone = true
-		}
-	}
-
-	return b, upstream
 }
 
 func branchAheadBehind(repoPath, branchName, upstream string) (int, int, error) {

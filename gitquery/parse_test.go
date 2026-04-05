@@ -202,3 +202,64 @@ func TestParseAheadBehind_MalformedInput(t *testing.T) {
 		t.Errorf("expected (0, 0), got (%d, %d)", ahead, behind)
 	}
 }
+
+func TestParseBranchLine_WithUpstream(t *testing.T) {
+	line := "feature\trefs/remotes/origin/feature\t"
+
+	b, upstream := gitquery.ParseBranchLine(line)
+
+	if b.Name != "feature" {
+		t.Errorf("expected Name %q, got %q", "feature", b.Name)
+	}
+	if !b.HasUpstream {
+		t.Error("expected HasUpstream = true")
+	}
+	if b.UpstreamGone {
+		t.Error("expected UpstreamGone = false")
+	}
+	if upstream != "refs/remotes/origin/feature" {
+		t.Errorf("expected upstream %q, got %q", "refs/remotes/origin/feature", upstream)
+	}
+}
+
+func TestParseBranchLine_UpstreamGone(t *testing.T) {
+	line := "old-feature\trefs/remotes/origin/old-feature\t[gone]"
+
+	b, _ := gitquery.ParseBranchLine(line)
+
+	if !b.HasUpstream {
+		t.Error("expected HasUpstream = true")
+	}
+	if !b.UpstreamGone {
+		t.Error("expected UpstreamGone = true")
+	}
+}
+
+func TestParseBranchLine_NoUpstream(t *testing.T) {
+	line := "local-only\t\t"
+
+	b, upstream := gitquery.ParseBranchLine(line)
+
+	if b.Name != "local-only" {
+		t.Errorf("expected Name %q, got %q", "local-only", b.Name)
+	}
+	if b.HasUpstream {
+		t.Error("expected HasUpstream = false")
+	}
+	if upstream != "" {
+		t.Errorf("expected empty upstream, got %q", upstream)
+	}
+}
+
+func TestParseBranchLine_NameOnly(t *testing.T) {
+	line := "main"
+
+	b, _ := gitquery.ParseBranchLine(line)
+
+	if b.Name != "main" {
+		t.Errorf("expected Name %q, got %q", "main", b.Name)
+	}
+	if b.HasUpstream {
+		t.Error("expected HasUpstream = false")
+	}
+}

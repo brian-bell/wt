@@ -5,6 +5,24 @@ import (
 	"strings"
 )
 
+// ParseBranchLine parses one line of git for-each-ref --format=%(refname:short)\t%(upstream)\t%(upstream:track).
+// Returns the branch (with Name, HasUpstream, UpstreamGone populated) and the upstream ref string.
+func ParseBranchLine(line string) (Branch, string) {
+	parts := strings.SplitN(line, "\t", 3)
+	b := Branch{Name: parts[0]}
+
+	var upstream string
+	if len(parts) > 1 && parts[1] != "" {
+		b.HasUpstream = true
+		upstream = parts[1]
+		if len(parts) > 2 && strings.Contains(parts[2], "gone") {
+			b.UpstreamGone = true
+		}
+	}
+
+	return b, upstream
+}
+
 // ParseReflog parses the output of git reflog --format=%h%x00%gd%x00%ar%x00%gs.
 func ParseReflog(text string) []ReflogEntry {
 	text = strings.TrimSpace(text)
