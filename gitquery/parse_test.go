@@ -49,3 +49,41 @@ func TestParseCommitLog_MalformedLineSkipped(t *testing.T) {
 		t.Fatalf("expected 2 commits (malformed skipped), got %d", len(commits))
 	}
 }
+
+func TestParseReflog_ParsesMultipleEntries(t *testing.T) {
+	input := "abc1234\x00HEAD@{0}\x002 hours ago\x00commit: Add feature\nabc5678\x00HEAD@{1}\x003 days ago\x00checkout: moving from main to feat\n"
+
+	entries := gitquery.ParseReflog(input)
+
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	if entries[0].Hash != "abc1234" {
+		t.Errorf("expected Hash %q, got %q", "abc1234", entries[0].Hash)
+	}
+	if entries[0].Selector != "HEAD@{0}" {
+		t.Errorf("expected Selector %q, got %q", "HEAD@{0}", entries[0].Selector)
+	}
+	if entries[0].Date != "2 hours ago" {
+		t.Errorf("expected Date %q, got %q", "2 hours ago", entries[0].Date)
+	}
+	if entries[0].Subject != "commit: Add feature" {
+		t.Errorf("expected Subject %q, got %q", "commit: Add feature", entries[0].Subject)
+	}
+}
+
+func TestParseReflog_EmptyInput(t *testing.T) {
+	if entries := gitquery.ParseReflog(""); entries != nil {
+		t.Errorf("expected nil, got %v", entries)
+	}
+}
+
+func TestParseReflog_MalformedLineSkipped(t *testing.T) {
+	input := "abc1234\x00HEAD@{0}\x002 hours ago\x00commit: Add feature\nbadline\n"
+
+	entries := gitquery.ParseReflog(input)
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry (malformed skipped), got %d", len(entries))
+	}
+}

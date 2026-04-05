@@ -176,26 +176,7 @@ func ListReflog(repoPath string) ([]ReflogEntry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listing reflog: %w", err)
 	}
-
-	text = strings.TrimSpace(text)
-	if text == "" {
-		return nil, nil
-	}
-
-	var entries []ReflogEntry
-	for _, line := range strings.Split(text, "\n") {
-		parts := strings.SplitN(line, "\x00", 4)
-		if len(parts) != 4 {
-			continue
-		}
-		entries = append(entries, ReflogEntry{
-			Hash:     parts[0],
-			Selector: parts[1],
-			Date:     parts[2],
-			Subject:  parts[3],
-		})
-	}
-	return entries, nil
+	return ParseReflog(text), nil
 }
 
 // ReflogDiff returns the diff for a reflog entry by running git diff <hash>^ <hash>.
